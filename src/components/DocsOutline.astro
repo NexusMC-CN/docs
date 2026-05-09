@@ -1,0 +1,41 @@
+---
+import DocsIcon from './DocsIcon.astro';
+
+interface HeadingItem {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  headings?: HeadingItem[];
+  compact?: boolean;
+}
+
+const { headings = [], compact = false } = Astro.props;
+---
+
+<aside class:list={[compact ? 'docs-inline-outline' : 'docs-outline-panel']}>
+  <div class="docs-kicker docs-kicker--icon mb-3">
+    <DocsIcon name="format-list-bulleted" />
+    <span>本页目录</span>
+  </div>
+  {headings.length ? (
+    <nav class="space-y-1">
+      {headings
+        .filter((item) => item.depth <= 3)
+        .map((item) => (
+          <a
+            href={`#${item.slug}`}
+            class="docs-outline-link px-3 py-2"
+            style={`padding-left:${0.75 + Math.max(0, item.depth - 2) * 0.85}rem`}
+          >
+            <DocsIcon name="chevron-right" class="docs-outline-link__chevron" />
+            <span>{item.text}</span>
+          </a>
+        ))}
+    </nav>
+  ) : (
+    <p class="text-sm text-50">这篇文档没有生成页内目录。</p>
+  )}
+</aside>

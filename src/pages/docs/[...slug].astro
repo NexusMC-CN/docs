@@ -1,0 +1,21 @@
+---
+import { getCollection, render } from 'astro:content';
+import DocsPageLayout from '../../layouts/DocsPageLayout.astro';
+import { DEFAULT_DOC_LOCALE, filterPublicDocsByLocale, stripDocLocalePrefix } from '../../lib/docs';
+
+export async function getStaticPaths() {
+  const docs = filterPublicDocsByLocale(await getCollection('docs'), DEFAULT_DOC_LOCALE);
+  return docs.map((entry) => ({
+    params: { slug: stripDocLocalePrefix(entry.slug, DEFAULT_DOC_LOCALE) },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const allDocs = (await getCollection('docs')).filter((item) => !item.data.draft);
+const { Content, headings } = await render(entry);
+---
+
+<DocsPageLayout entry={entry} allDocs={allDocs} headings={headings}>
+  <Content />
+</DocsPageLayout>

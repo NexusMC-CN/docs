@@ -1,0 +1,59 @@
+---
+import DocsBaseLayout from './DocsBaseLayout.astro';
+import DocsIcon from '../components/DocsIcon.astro';
+import DocsSidebar from '../components/DocsSidebar.astro';
+import DocsOutline from '../components/DocsOutline.astro';
+import DocsPagination from '../components/DocsPagination.astro';
+import type { DocEntry } from '../lib/docs';
+import { buildDocEntryHref, filterPublicDocsByLocale, getDocLocale, getPrevNext, groupDocs } from '../lib/docs';
+
+interface Props {
+  entry: DocEntry;
+  allDocs: DocEntry[];
+  headings?: { depth: number; slug: string; text: string }[];
+}
+
+const { entry, allDocs, headings = [] } = Astro.props;
+const locale = getDocLocale(entry);
+const localeDocs = filterPublicDocsByLocale(allDocs, locale);
+const groups = groupDocs(localeDocs);
+const { prev, next } = getPrevNext(localeDocs, entry.slug);
+---
+
+<DocsBaseLayout title={entry.data.title} description={entry.data.description} locale={locale}>
+  <main class="docs-shell docs-shell--article">
+    <div class="docs-page-grid docs-page-grid--article grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <DocsSidebar groups={groups} currentSlug={entry.slug} />
+      <article class="docs-content-card card-base px-5 py-6 sm:px-7 sm:py-7">
+        <header class="docs-page-header">
+          <div class="docs-page-header__eyebrow">
+            <DocsIcon name="tag-outline" />
+            <span>{entry.data.section}</span>
+          </div>
+          <h1 class="docs-page-title">{entry.data.title}</h1>
+          {entry.data.description && <p class="docs-page-description">{entry.data.description}</p>}
+          <div class="docs-page-meta">
+            <span class="docs-page-pill">
+              <DocsIcon name="file-document-outline" />
+              <span>MDX</span>
+            </span>
+            <a href={buildDocEntryHref(entry)} class="docs-page-pill no-underline">
+              <DocsIcon name="link-variant" />
+              <span>固定链接</span>
+            </a>
+          </div>
+          <div class="docs-page-outline-mobile">
+            <DocsOutline headings={headings} compact={true} />
+          </div>
+        </header>
+        <div class="prose max-w-none docs-prose">
+          <slot />
+        </div>
+        <DocsPagination prev={prev} next={next} />
+      </article>
+      <div class="docs-page-outline-desktop">
+        <DocsOutline headings={headings} />
+      </div>
+    </div>
+  </main>
+</DocsBaseLayout>

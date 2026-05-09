@@ -1,0 +1,752 @@
+---
+title: 用户个人 API
+description: 从认证方式、Base URL、响应格式到请求路径、参数、示例和常见失败原因，说明如何用个人 API Token 操作自己的内容。
+section: API
+order: 10
+---
+
+## 适用范围
+
+用户个人 API 面向用户自己的脚本、投稿工具、内容同步程序和自动化流程。它不是后台管理接口，也不是组织接口。
+
+::: note
+个人 API 只代表 Token 所属用户本人。它不会继承版主、管理员或组织身份的额外后台能力。
+:::
+
+当前开放能力集中在四类内容：
+
+| 内容类型 | 创建 | 更新自己的内容 | 删除 |
+| --- | --- | --- | --- |
+| 资源 | 支持 | 支持 | 不支持 |
+| 帖子 | 支持 | 支持 | 不支持 |
+| 找服玩投稿 | 支持 | 支持 | 不支持 |
+| 视频投稿 | 支持 | 支持 | 不支持 |
+
+所有用个人 API Token 发起的内容写操作都遵循两条规则：
+
+- 只能操作 Token 所属用户自己的内容。
+- 暂不支持以组织身份投稿或编辑组织内容。
+
+::: caution[当前不支持]
+个人 API Token 当前不开放删除、审核、推荐、封禁、积分调整等高风险能力。
+:::
+
+## Base URL
+
+生产环境接口基础地址：
+
+```text
+https://www.nexusmc.cn/api
+```
+
+如果你在本地开发环境调试，把域名替换为本地服务地址即可：
+
+```text
+http://localhost:3000/api
+```
+
+本文后续路径都以 `/api` 开头展示。例如：
+
+```text
+POST /api/posts
+```
+
+完整地址就是：
+
+```text
+https://www.nexusmc.cn/api/posts
+```
+
+## 认证方式
+
+用户个人 API 使用 Bearer Token 认证。
+
+```http
+Authorization: Bearer avm_pat_xxxxx_xxxxx
+Content-Type: application/json
+Accept: application/json
+```
+
+Token 明文只会在创建时返回一次。创建后请立即保存到安全位置，不要放进公开仓库、前端代码或可被下载的配置文件中。
+
+::: warning
+如果完整 Token 丢失，服务端无法再次展示。请撤销旧 Token 后重新创建。
+:::
+
+### Token 格式
+
+个人 API Token 当前以 `avm_pat_` 开头：
+
+```text
+avm_pat_<lookupKey>_<secret>
+```
+
+服务端只保存密文摘要。页面后续只会显示 `tokenPrefix`，不会再次展示完整 Token。
+
+### Scope 权限
+
+Token 创建时需要勾选 scope。调用接口时，scope 不足会返回 `403`。
+
+| Scope | 可调用能力 |
+| --- | --- |
+| `resource:create` | 创建自己的资源 |
+| `resource:update:self` | 更新自己的资源 |
+| `post:create` | 创建自己的帖子 |
+| `post:update:self` | 更新自己的帖子 |
+| `player:create` | 创建自己的找服玩投稿 |
+| `player:update:self` | 更新自己的找服玩投稿 |
+| `video:create` | 创建自己的视频投稿 |
+| `video:update:self` | 更新自己的视频投稿 |
+
+::: tip
+建议一个脚本使用一个 Token，并只授予它实际需要的最小 scope。这样某个脚本泄露或废弃时，可以只撤销对应 Token。
+:::
+
+## 响应格式
+
+成功响应通常直接返回创建或更新后的对象，不会统一包在 `data` 字段里。
+
+```json
+{
+  "id": "clx_example_id",
+  "title": "示例标题",
+  "status": "pending",
+  "createdAt": "2026-05-09T00:00:00.000Z",
+  "updatedAt": "2026-05-09T00:00:00.000Z"
+}
+```
+
+失败响应至少包含 `error` 字段，部分安全或权限错误还会包含 `code`、`requiredScope` 等辅助字段。
+
+```json
+{
+  "error": "当前 API Token 没有此操作权限",
+  "code": "API_TOKEN_SCOPE_REQUIRED",
+  "requiredScope": "post:create"
+}
+```
+
+## 快速开始
+
+下面示例用个人 Token 创建一篇草稿帖子。
+
+::: code-group
+
+```bash [curl]
+curl -X POST "https://www.nexusmc.cn/api/posts" \
+  -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{
+    "title": "自动同步测试帖",
+    "content": "这是一篇由脚本创建的草稿。",
+    "boardId": "general",
+    "isDraft": true
+  }'
+```
+
+```js [fetch.js]
+const response = await fetch('https://www.nexusmc.cn/api/posts', {
+  method: 'POST',
+  headers: {
+    Authorization: 'Bearer avm_pat_xxxxx_xxxxx',
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  },
+  body: JSON.stringify({
+    title: '自动同步测试帖',
+    content: '这是一篇由脚本创建的草稿。',
+    boardId: 'general',
+    isDraft: true,
+  }),
+})
+
+if (!response.ok) {
+  throw new Error(await response.text())
+}
+
+const post = await response.json()
+```
+
+:::
+
+成功时返回帖子对象，状态通常为：
+
+- `draft`：请求中传了 `isDraft: true`
+- `pending`：正式投稿后进入审核
+
+## 接口总览
+
+| 方法 | 路径 | 需要 scope | 说明 |
+| --- | --- | --- | --- |
+| `POST` | `/api/resources` | `resource:create` | 创建自己的资源 |
+| `PUT` | `/api/resources/{id}` | `resource:update:self` | 更新自己的资源 |
+| `POST` | `/api/posts` | `post:create` | 创建自己的帖子 |
+| `PUT` | `/api/posts/{id}` | `post:update:self` | 更新自己的帖子 |
+| `POST` | `/api/players` | `player:create` | 创建自己的找服玩投稿 |
+| `PUT` | `/api/players/{id}` | `player:update:self` | 更新自己的找服玩投稿 |
+| `POST` | `/api/videos` | `video:create` | 创建自己的视频投稿 |
+| `PUT` | `/api/videos/{id}` | `video:update:self` | 更新自己的视频投稿 |
+
+::: important
+所有更新接口都只能更新当前 Token 所属用户自己的内容。协作者、组织成员、版主身份都不会扩大个人 Token 的可更新范围。
+:::
+
+## 创建资源
+
+```http
+POST /api/resources
+```
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `title` | `string` | 是 | 资源标题，最长 200 字符。 |
+| `content` | `string` 或 `object` | 是 | 资源正文。正式投稿时需要满足站点正文长度规则。 |
+| `category` | `string` | 是 | 资源分类 ID 或分类值。 |
+| `description` | `string` | 否 | 摘要，最长 1000 字符。 |
+| `platform` | `string` | 否 | 平台，常见值如 `java`。 |
+| `subCategory` | 任意 | 否 | 二级分类，按站点分类配置传值。 |
+| `thirdLevelCats` | 任意 | 否 | 三级分类，按站点分类配置传值。 |
+| `sideSupport` | `string` | 否 | 服务端、客户端或两端支持情况。 |
+| `mcVersions` | `array` | 否 | 支持的 Minecraft 版本。 |
+| `tags` | `array` | 否 | 自定义标签。 |
+| `officialTags` | `array` | 否 | 官方标签，需要符合当前分类允许范围。 |
+| `fileUrl` | `string` | 否 | 下载地址，最长 500 字符。 |
+| `downloadType` | `string` | 否 | 下载类型。`external` 表示外部链接，否则按本地下载处理。 |
+| `extractCode` | `string` | 否 | 外部网盘提取码。 |
+| `fileSize` | `number` | 否 | 文件大小。 |
+| `fileName` | `string` | 否 | 文件名，最长 200 字符。 |
+| `coverImage` | `string` | 否 | 封面图地址，最长 500 字符。 |
+| `version` | `string` | 否 | 资源版本号，最长 50 字符。 |
+| `dependencies` | `array` | 否 | 依赖资源列表。 |
+| `tutorialPostIds` | `array` | 否 | 关联教程帖 ID。 |
+| `documentationPostRefs` | `array` | 否 | 关联文档帖引用。 |
+| `additionalFiles` | `array` | 否 | 附加文件列表。 |
+| `sourceType` | `string` | 否 | 来源类型，最长 20 字符。 |
+| `repositoryUrl` | `string` | 否 | 仓库地址。 |
+| `communicationUrl` | `string` | 否 | 交流地址。 |
+| `documentationUrl` | `string` | 否 | 外部文档地址。 |
+| `isPaid` | `boolean` | 否 | 是否付费资源。付费资源必须使用有效外部下载链接，且分类必须允许。 |
+| `attributionType` | `string` | 否 | 转载、原创等归属类型。 |
+| `isDraft` | `boolean` | 否 | 是否保存为草稿。 |
+| `galleryMode` | `string` | 否 | `auto` 或 `manual`。 |
+| `galleryImages` | `array` | 否 | 图集图片地址列表。 |
+| `contributors` | `array` | 否 | 协作者列表。 |
+| `customSlug` | `string` | 否 | 自定义公开路径，最长 120 字符。 |
+| `organizationId` | `string` | 否 | 个人 API Token 暂不支持传组织身份；传入非空值会被拒绝。 |
+
+### 请求示例
+
+```bash
+curl -X POST "https://www.nexusmc.cn/api/resources" \
+  -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "示例材质包",
+    "description": "用于演示个人 API 的资源投稿。",
+    "content": "这里填写资源正文，正式投稿时需要满足站点正文长度规则。",
+    "platform": "java",
+    "category": "resource-pack",
+    "mcVersions": ["1.20.1"],
+    "tags": ["自动同步"],
+    "downloadType": "external",
+    "fileUrl": "https://example.com/download/resource.zip",
+    "version": "1.0.0",
+    "isDraft": true
+  }'
+```
+
+### 响应示例
+
+```json
+{
+  "id": "resource_id",
+  "title": "示例材质包",
+  "authorId": "user_id",
+  "status": "draft",
+  "platform": "java",
+  "category": "resource-pack",
+  "version": "1.0.0",
+  "createdAt": "2026-05-09T00:00:00.000Z",
+  "updatedAt": "2026-05-09T00:00:00.000Z"
+}
+```
+
+## 更新资源
+
+```http
+PUT /api/resources/{id}
+```
+
+`id` 必须是资源 ID。个人 API Token 只能更新 `authorId` 等于当前用户的资源。
+
+请求参数与创建资源基本一致，所有字段都是可选字段。传入已发布或被拒绝的资源更新后，普通用户通常会重新进入审核。
+
+```bash
+curl -X PUT "https://www.nexusmc.cn/api/resources/resource_id" \
+  -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "示例材质包 1.1.0",
+    "version": "1.1.0",
+    "content": "更新后的资源正文。",
+    "isDraft": false
+  }'
+```
+
+## 创建帖子
+
+```http
+POST /api/posts
+```
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `title` | `string` | 是 | 帖子标题，最长 200 字符。 |
+| `content` | `string` 或 `object` | 是 | 帖子正文。正式发布时需要满足站点正文长度规则。 |
+| `boardId` | `string` | 是 | 板块 ID，最长 50 字符。 |
+| `copyrightEnabled` | `boolean` | 否 | 是否启用版权声明。 |
+| `copyrightLicense` | `string` | 否 | 版权协议，最长 50 字符。 |
+| `isDraft` | `boolean` | 否 | 是否保存为草稿。 |
+| `tags` | `array<string>` | 否 | 标签，最多 20 个，每个最长 50 字符。 |
+| `visibility` | `string` | 否 | 可见性，按站点帖子可见性配置传值。 |
+| `visibilityAllowUserIds` | `array<string>` | 否 | 部分可见时允许查看的用户 ID，最多 100 个。 |
+| `accessMode` | `string` | 否 | 访问方式。若为密码访问，需要同时传 `accessPassword`。 |
+| `accessPassword` | `string` | 否 | 访问密码，4 到 64 字符。 |
+| `customSlug` | `string` | 否 | 自定义公开路径，最长 120 字符。 |
+| `topicTagIds` | `array<string>` | 否 | 板块话题标签 ID，最多 5 个。 |
+| `organizationId` | `string` | 否 | 个人 API Token 暂不支持传组织身份；传入非空值会被拒绝。 |
+
+### 请求示例
+
+```bash
+curl -X POST "https://www.nexusmc.cn/api/posts" \
+  -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "自动同步更新日志",
+    "content": "这里是由外部脚本同步过来的更新内容。",
+    "boardId": "updates",
+    "tags": ["同步", "更新日志"],
+    "isDraft": true
+  }'
+```
+
+### 响应示例
+
+```json
+{
+  "id": "post_id",
+  "title": "自动同步更新日志",
+  "authorId": "user_id",
+  "boardId": "updates",
+  "status": "draft",
+  "visibility": "public",
+  "createdAt": "2026-05-09T00:00:00.000Z",
+  "updatedAt": "2026-05-09T00:00:00.000Z"
+}
+```
+
+## 更新帖子
+
+```http
+PUT /api/posts/{id}
+```
+
+`id` 可以是帖子 ID，也可以是服务端能够解析的帖子公开标识。个人 API Token 只能更新作者为当前用户的帖子。
+
+请求参数与创建帖子一致，所有字段都是可选字段。传入正式发布字段时，草稿可能会发布进入审核；已发布内容更新后通常会重新进入审核。
+
+```bash
+curl -X PUT "https://www.nexusmc.cn/api/posts/post_id" \
+  -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "自动同步更新日志 v2",
+    "content": "更新后的帖子正文。",
+    "isDraft": false
+  }'
+```
+
+## 创建找服玩投稿
+
+```http
+POST /api/players
+```
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `title` | `string` | 是 | 服务器标题。 |
+| `description` | `string` | 是 | 简短描述。 |
+| `content` | `string` 或 `object` | 是 | 服务器介绍正文。 |
+| `category` | `string` | 是 | 找服玩分类。 |
+| `ip` | `string` | 是 | 服务器地址。 |
+| `onlineMode` | `boolean` | 是 | 是否开启正版验证。 |
+| `networkEnvironments` | `array<string>` | 是 | 网络环境，至少 1 项。 |
+| `platform` | `string` | 否 | 平台，默认 `java`。 |
+| `versions` | `array<string>` | 否 | 支持版本。 |
+| `tags` | `array<string>` | 否 | 标签。 |
+| `tutorialPostIds` | `array<string>` | 否 | 关联教程帖 ID。 |
+| `port` | `number` | 否 | 服务器端口，默认 `25565`。 |
+| `website` | `string` | 否 | 官网。 |
+| `qqGroup` | `string` | 否 | QQ 群。 |
+| `discord` | `string` | 否 | Discord 链接或标识。 |
+| `coverImage` | `string` | 否 | 封面图。 |
+| `galleryMode` | `string` | 否 | `auto` 或 `manual`。 |
+| `galleryImages` | `array<string>` | 否 | 图集图片。 |
+| `onlineCount` | `number` | 否 | 当前在线人数。 |
+| `maxPlayers` | `number` | 否 | 最大人数。 |
+| `isDraft` | `boolean` | 否 | 是否保存为草稿。 |
+| `customSlug` | `string` | 否 | 自定义公开路径。 |
+| `organizationId` | `string` | 否 | 个人 API Token 暂不支持传组织身份；传入非空值会被拒绝。 |
+
+### 请求示例
+
+```bash
+curl -X POST "https://www.nexusmc.cn/api/players" \
+  -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "示例生存服",
+    "description": "长期开放的生存服务器。",
+    "content": "这里填写完整服务器介绍。",
+    "platform": "java",
+    "category": "survival",
+    "ip": "play.example.com",
+    "port": 25565,
+    "onlineMode": true,
+    "networkEnvironments": ["mainland"],
+    "versions": ["1.20.1"],
+    "isDraft": true
+  }'
+```
+
+### 响应示例
+
+```json
+{
+  "id": "player_id",
+  "title": "示例生存服",
+  "authorId": "user_id",
+  "status": "draft",
+  "ip": "play.example.com",
+  "port": 25565,
+  "createdAt": "2026-05-09T00:00:00.000Z",
+  "updatedAt": "2026-05-09T00:00:00.000Z"
+}
+```
+
+## 更新找服玩投稿
+
+```http
+PUT /api/players/{id}
+```
+
+`id` 必须是找服玩投稿 ID。个人 API Token 只能更新作者为当前用户的投稿。
+
+请求参数与创建找服玩投稿基本一致，所有字段都是可选字段。更新时如果最终结果缺少标题、描述、分类、服务器地址、正版验证状态或网络环境，会返回 `400`。
+
+```bash
+curl -X PUT "https://www.nexusmc.cn/api/players/player_id" \
+  -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "更新后的服务器简介。",
+    "versions": ["1.20.1", "1.21"],
+    "isDraft": false
+  }'
+```
+
+## 创建视频投稿
+
+```http
+POST /api/videos
+```
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `sourceUrl` | `string` | 是 | 视频链接。当前支持 Bilibili、腾讯视频或抖音链接。 |
+| `categoryId` | `string` | 否 | 视频分区 ID。不传时使用默认排序最靠前的分区。 |
+| `title` | `string` | 否 | 视频标题。不传时尝试从视频源元数据获取，仍为空时使用兜底标题。 |
+| `description` | `string` | 否 | 视频简介。 |
+| `customSlug` | `string` | 否 | 自定义公开路径。 |
+| `coverImage` | `string` | 否 | 手动指定封面图。 |
+| `tags` | `array<string>` | 否 | 标签。 |
+| `organizationId` | `string` | 否 | 个人 API Token 暂不支持传组织身份；传入非空值会被拒绝。 |
+
+### 请求示例
+
+```bash
+curl -X POST "https://www.nexusmc.cn/api/videos" \
+  -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceUrl": "https://www.bilibili.com/video/BVxxxxxxxxxx",
+    "title": "示例视频投稿",
+    "description": "这是一条通过个人 API 创建的视频投稿。",
+    "tags": ["教程", "演示"]
+  }'
+```
+
+### 响应示例
+
+```json
+{
+  "id": "video_id",
+  "title": "示例视频投稿",
+  "authorId": "user_id",
+  "status": "pending",
+  "sourceType": "bilibili",
+  "sourceUrl": "https://www.bilibili.com/video/BVxxxxxxxxxx",
+  "createdAt": "2026-05-09T00:00:00.000Z",
+  "updatedAt": "2026-05-09T00:00:00.000Z"
+}
+```
+
+## 更新视频投稿
+
+```http
+PUT /api/videos/{id}
+```
+
+`id` 必须是视频投稿 ID。个人 API Token 只能更新作者为当前用户的视频投稿。
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `title` | `string` | 更新标题。 |
+| `description` | `string` | 更新简介。 |
+| `categoryId` | `string` | 更新视频分区。 |
+| `sourceUrl` | `string` | 更新视频链接，仍只支持 Bilibili、腾讯视频或抖音。 |
+| `customSlug` | `string` | 更新自定义公开路径。 |
+| `coverImage` | `string` | 更新封面图。传空字符串可清空手动封面。 |
+| `tags` | `array<string>` | 更新标签。 |
+| `organizationId` | `string` | 个人 API Token 暂不支持传组织身份；传入非空值会被拒绝。 |
+
+```bash
+curl -X PUT "https://www.nexusmc.cn/api/videos/video_id" \
+  -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "示例视频投稿：更新版",
+    "description": "更新后的视频简介。"
+  }'
+```
+
+## Token 管理接口
+
+Token 管理接口主要给设置页使用。它们需要用户已登录，也会接受正常的认证中间件。
+
+::: details Token 管理接口一般什么时候用
+普通脚本通常只需要拿到一个已创建好的 Token，然后调用投稿接口。只有当你在做“账号设置页”“Token 管理面板”或内部工具时，才需要调用本节这些接口。
+:::
+
+### 获取可选 scope
+
+```http
+GET /api/users/api-tokens/scopes
+```
+
+```json
+{
+  "scopes": [
+    {
+      "value": "resource:create",
+      "label": "resource:create"
+    }
+  ]
+}
+```
+
+### 获取自己的 Token 列表
+
+```http
+GET /api/users/api-tokens
+```
+
+```json
+{
+  "tokens": [
+    {
+      "id": "token_record_id",
+      "name": "同步脚本",
+      "tokenPrefix": "avm_pat_abcdef123456_xxxxxx",
+      "scopes": ["post:create"],
+      "lastUsedAt": null,
+      "lastUsedIp": null,
+      "expiresAt": null,
+      "revokedAt": null,
+      "createdAt": "2026-05-09T00:00:00.000Z",
+      "updatedAt": "2026-05-09T00:00:00.000Z"
+    }
+  ],
+  "maxTokens": 20
+}
+```
+
+### 创建 Token
+
+```http
+POST /api/users/api-tokens
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `name` | `string` | 是 | Token 名称，1 到 80 字符。 |
+| `scopes` | `array<string>` | 是 | 至少 1 个 scope。 |
+| `expiresInDays` | `number` | 否 | 有效天数，1 到 365。不传表示长期有效。 |
+
+```json
+{
+  "name": "帖子同步脚本",
+  "scopes": ["post:create", "post:update:self"],
+  "expiresInDays": 90
+}
+```
+
+成功响应会返回完整 Token 明文：
+
+```json
+{
+  "token": "avm_pat_lookup_secret",
+  "record": {
+    "id": "token_record_id",
+    "name": "帖子同步脚本",
+    "tokenPrefix": "avm_pat_lookup_secret",
+    "scopes": ["post:create", "post:update:self"],
+    "expiresAt": "2026-08-07T15:59:59.999Z",
+    "createdAt": "2026-05-09T00:00:00.000Z"
+  }
+}
+```
+
+### 更新 Token
+
+```http
+PUT /api/users/api-tokens/{id}
+```
+
+可更新字段：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `name` | `string` | 新名称，1 到 80 字符。 |
+| `scopes` | `array<string>` | 新 scope 列表，至少 1 个。 |
+| `expiresInDays` | `number` 或 `null` | 1 到 365；传 `null` 表示长期有效。 |
+
+成功响应：
+
+```json
+{
+  "record": {
+    "id": "token_record_id",
+    "name": "新的 Token 名称",
+    "tokenPrefix": "avm_pat_lookup_secret",
+    "scopes": ["post:create"],
+    "lastUsedAt": null,
+    "lastUsedIp": null,
+    "expiresAt": null,
+    "revokedAt": null,
+    "createdAt": "2026-05-09T00:00:00.000Z",
+    "updatedAt": "2026-05-09T00:00:00.000Z"
+  }
+}
+```
+
+### 撤销 Token
+
+```http
+DELETE /api/users/api-tokens/{id}
+```
+
+成功响应：
+
+```json
+{
+  "success": true
+}
+```
+
+## 常见失败原因
+
+::: warning
+失败响应的 `error` 文案可能会随服务端校验细节调整。自动化脚本应优先判断 HTTP 状态码和稳定的 `code` 字段。
+:::
+
+::: details 展开查看失败原因对照表
+
+| 状态码 | 典型响应 | 原因 | 处理方式 |
+| --- | --- | --- | --- |
+| `400` | `{ "error": "标题不能为空" }` | 请求参数缺失或格式不符合接口要求。 | 按对应接口的请求参数检查字段、类型和长度。 |
+| `400` | `{ "error": "仅支持 Bilibili、腾讯视频或抖音链接" }` | 视频链接无法解析或来源不支持。 | 更换受支持的视频链接。 |
+| `401` | `{ "error": "Unauthorized" }` | 未传 Token、Token 格式错误、Token 已撤销、已过期，或所属账号不可用。 | 检查 `Authorization` 请求头，重新创建 Token。 |
+| `403` | `{ "code": "API_TOKEN_SCOPE_REQUIRED" }` | Token 没有所需 scope。 | 在设置页调整 Token scope，或创建新 Token。 |
+| `403` | `{ "code": "API_TOKEN_ORGANIZATION_FORBIDDEN" }` | 请求中传入了非空 `organizationId`。 | 个人 API Token 暂不支持组织身份，移除该字段。 |
+| `403` | `{ "error": "个人 API Token 只能编辑自己的帖子" }` | 正在编辑不属于当前用户的内容。 | 确认目标内容作者就是 Token 所属用户。 |
+| `403` | `{ "code": "SECURITY_SETUP_REQUIRED" }` | 站点安全策略要求先绑定 2FA 或通行密钥。 | 到账号设置中绑定增强认证后重试。 |
+| `404` | `{ "error": "Resource not found" }` | 目标内容不存在，或路径中的 ID 不正确。 | 检查内容 ID。 |
+| `429` | `{ "error": "..." }` | 投稿过快或触发站点内容发布限制。 | 降低同步频率，稍后重试。 |
+| `500` | `{ "error": "Internal server error" }` | 服务端内部错误。 | 保留请求时间、路径和请求体，稍后重试或联系站点维护者。 |
+
+:::
+
+## 疑难解答
+
+### 为什么我传了 Token 还是返回 `401`？
+
+先确认请求头完整且没有多余空格：
+
+```http
+Authorization: Bearer avm_pat_xxxxx_xxxxx
+```
+
+如果格式正确，常见原因是 Token 已撤销、已过期、明文复制不完整，或 Token 所属账号不再处于可用状态。完整 Token 只在创建时显示一次，丢失后需要重新创建。
+
+### 为什么创建内容返回 `403`？
+
+最常见原因是 scope 不足。例如调用 `POST /api/posts` 需要 `post:create`，调用 `PUT /api/posts/{id}` 需要 `post:update:self`。
+
+另一个常见原因是请求体里带了非空 `organizationId`。个人 API Token 当前不能以组织身份投稿。
+
+### 为什么更新自己的内容也失败？
+
+请确认路径中的 `{id}` 是内容真实 ID。资源、找服玩、视频更新接口都按 ID 查找；帖子更新接口可以解析部分公开标识，但仍建议脚本保存并使用接口返回的 `id`。
+
+还要确认目标内容的作者就是 Token 所属用户。协作者、组织成员、版主权限不等同于个人 Token 权限。
+
+### 为什么正式发布时要求绑定 2FA 或通行密钥？
+
+站点可能启用了增强认证策略。正式创建或重新提交部分内容时，如果账号没有绑定二步验证或通行密钥，服务端会返回：
+
+```json
+{
+  "error": "为保障账号安全，请先在设置中绑定二步验证(2FA)或通行密钥后再执行此操作",
+  "code": "SECURITY_SETUP_REQUIRED",
+  "requireSecuritySetup": true
+}
+```
+
+处理方式是在账号设置中完成 2FA 或通行密钥绑定，然后重试请求。
+
+### 为什么草稿可以创建，正式投稿失败？
+
+草稿通常只做基础字段校验；正式投稿还会检查正文长度、分类权限、发布频率、安全绑定、内容审核规则等。建议脚本先保存草稿，再由用户确认后正式提交。
+
+### 可以用个人 API Token 删除内容吗？
+
+不可以。当前个人 API Token 只开放创建和更新，不开放删除、审核、推荐、积分调整等高风险能力。
+
+### 可以把一个 Token 给多个脚本共用吗？
+
+不建议。更好的做法是为每个脚本创建独立 Token，并只给它需要的 scope。这样某个脚本泄露或废弃时，可以只撤销对应 Token。
+
+### Token 泄露了怎么办？
+
+立即到设置页撤销对应 Token，然后创建新 Token。撤销后旧 Token 会立刻无法通过认证。

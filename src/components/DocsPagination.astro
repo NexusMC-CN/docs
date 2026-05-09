@@ -1,0 +1,35 @@
+---
+import type { DocEntry } from '../lib/docs';
+import DocsIcon from './DocsIcon.astro';
+import { buildDocEntryHref } from '../lib/docs';
+
+interface Props {
+  prev?: DocEntry | null;
+  next?: DocEntry | null;
+}
+
+const { prev = null, next = null } = Astro.props;
+---
+
+<div class="docs-pagination mt-10 grid gap-3 sm:grid-cols-2">
+  {prev ? (
+    <a href={buildDocEntryHref(prev)} class="card-base block p-4 transition-transform hover:-translate-y-0.5">
+      <div class="docs-kicker docs-kicker--icon mb-2">
+        <DocsIcon name="arrow-left" />
+        <span>上一篇</span>
+      </div>
+      <div class="text-sm font-semibold text-90">{prev.data.title}</div>
+      {prev.data.description && <p class="mt-1 text-sm text-50">{prev.data.description}</p>}
+    </a>
+  ) : <div></div>}
+  {next ? (
+    <a href={buildDocEntryHref(next)} class="card-base block p-4 text-right transition-transform hover:-translate-y-0.5">
+      <div class="docs-kicker docs-kicker--icon docs-kicker--end mb-2">
+        <span>下一篇</span>
+        <DocsIcon name="arrow-right" />
+      </div>
+      <div class="text-sm font-semibold text-90">{next.data.title}</div>
+      {next.data.description && <p class="mt-1 text-sm text-50">{next.data.description}</p>}
+    </a>
+  ) : <div></div>}
+</div>

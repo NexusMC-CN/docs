@@ -1,0 +1,88 @@
+---
+import '../styles/docs.css';
+import DocsIcon from '../components/DocsIcon.astro';
+import { buildDocsIndexHref, DEFAULT_DOC_LOCALE, getDocLocaleMeta, type DocLocale } from '../lib/docs';
+
+interface Props {
+  title: string;
+  description?: string;
+  locale?: DocLocale;
+}
+
+const {
+  title,
+  description = '论坛文档中心',
+  locale = DEFAULT_DOC_LOCALE,
+} = Astro.props;
+const mainSiteUrl = process.env.DOCS_MAIN_SITE_URL || process.env.SITE_URL || 'https://www.nexusmc.cn';
+const localeMeta = getDocLocaleMeta(locale);
+const browserTitle = title === '帮助中心'
+  ? 'NexusMC 帮助中心与文档入口'
+  : title
+    ? `${title} - NexusMC 帮助中心`
+    : 'NexusMC 帮助中心与文档入口';
+---
+
+<!DOCTYPE html>
+<html lang={localeMeta.htmlLang} style="--hue: 217;" data-font-family="oppo-sans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{browserTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+  </head>
+  <body>
+    <header class="docs-topbar">
+      <div class="docs-topbar__inner">
+        <a href="/" class="docs-brand no-underline">
+          <img
+            src="/logo.jpg"
+            alt="MC 论坛文档"
+            class="docs-brand__logo rounded-xl object-cover"
+          />
+          <span class="docs-brand__title text-90">NexusMC 文档中心</span>
+        </a>
+        <nav class="docs-topbar__nav" aria-label="文档导航">
+          <a href={mainSiteUrl} class="docs-outline-link px-3 py-2">
+            <DocsIcon name="open-in-new" />
+            <span class="docs-topbar__label">返回主站</span>
+          </a>
+          <a href="/" class="docs-outline-link px-3 py-2">
+            <DocsIcon name="home-outline" />
+            <span class="docs-topbar__label">帮助中心</span>
+          </a>
+          <a href={buildDocsIndexHref(locale)} class="docs-outline-link px-3 py-2">
+            <DocsIcon name="book-open-page-variant" />
+            <span class="docs-topbar__label">文档目录</span>
+          </a>
+        </nav>
+      </div>
+    </header>
+    <slot />
+    <footer class="docs-footer mx-auto max-w-[1440px] px-4 pb-4 pt-4 sm:px-5 lg:px-6">
+      <div class="docs-footer-note rounded-[1.25rem] border px-5 py-4 text-sm text-50" style="border-color:var(--line-divider); background:color-mix(in srgb, var(--card-bg) 86%, transparent);">
+        <DocsIcon name="book-open-page-variant" />
+        <span>文档系统独立于论坛主站构建，内容使用 MDX 编写，界面延续论坛主题变量与阅读风格。</span>
+      </div>
+    </footer>
+    <script is:inline>
+      document.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+        const tab = target?.closest('[data-code-group-tab]');
+        if (!tab) return;
+        const group = tab.closest('[data-code-group]');
+        if (!group) return;
+        const index = tab.getAttribute('data-code-group-tab');
+        group.querySelectorAll('[data-code-group-tab]').forEach((item) => {
+          const active = item.getAttribute('data-code-group-tab') === index;
+          item.classList.toggle('is-active', active);
+          item.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        group.querySelectorAll('[data-code-group-panel]').forEach((item) => {
+          item.classList.toggle('is-active', item.getAttribute('data-code-group-panel') === index);
+        });
+      });
+    </script>
+  </body>
+</html>

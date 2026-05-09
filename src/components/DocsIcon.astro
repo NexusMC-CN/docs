@@ -1,0 +1,64 @@
+---
+import mdiIcons from '@iconify-json/mdi/icons.json';
+
+interface Props {
+  name: string;
+  size?: string | number;
+  label?: string;
+  class?: string;
+}
+
+const {
+  name,
+  size = '1em',
+  label,
+  class: className = '',
+} = Astro.props;
+
+type IconifyIcon = {
+  body: string;
+  width?: number;
+  height?: number;
+};
+
+type IconifyAlias = Partial<IconifyIcon> & {
+  parent: string;
+};
+
+const collection = mdiIcons as unknown as {
+  icons: Record<string, IconifyIcon>;
+  aliases?: Record<string, IconifyAlias>;
+  width?: number;
+  height?: number;
+};
+
+function resolveIcon(iconName: string, depth = 0): IconifyIcon | null {
+  if (depth > 3) return null;
+  const direct = collection.icons[iconName];
+  if (direct) return direct;
+  const alias = collection.aliases?.[iconName];
+  if (!alias) return null;
+  const parent = resolveIcon(alias.parent, depth + 1);
+  return parent ? { ...parent, ...alias, parent: undefined } as IconifyIcon : null;
+}
+
+const icon = resolveIcon(name);
+const width = icon?.width ?? collection.width ?? 24;
+const height = icon?.height ?? collection.height ?? 24;
+const normalizedSize = typeof size === 'number' ? `${size}px` : size;
+---
+
+{icon && (
+  <svg
+    class:list={['docs-icon', className]}
+    width={normalizedSize}
+    height={normalizedSize}
+    viewBox={`0 0 ${width} ${height}`}
+    role={label ? 'img' : undefined}
+    aria-label={label}
+    aria-hidden={label ? undefined : 'true'}
+    focusable="false"
+    fill="currentColor"
+    set:html={icon.body}
+  />
+)}

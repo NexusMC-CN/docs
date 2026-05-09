@@ -1,0 +1,210 @@
+---
+import { getCollection } from 'astro:content';
+import DocsBaseLayout from '../layouts/DocsBaseLayout.astro';
+import DocsIcon from '../components/DocsIcon.astro';
+import { buildDocEntryHref, buildDocsIndexHref, DEFAULT_DOC_LOCALE, filterPublicDocsByLocale, groupDocs, sortDocs } from '../lib/docs';
+
+const locale = DEFAULT_DOC_LOCALE;
+const docs = sortDocs(filterPublicDocsByLocale(await getCollection('docs'), locale));
+const groups = groupDocs(docs);
+const featuredDocs = docs.slice(0, 4);
+const docsIndexHref = buildDocsIndexHref(locale);
+const searchIndexJson = JSON.stringify(
+  docs.map((doc) => ({
+    title: doc.data.title,
+    description: doc.data.description || '',
+    section: doc.data.section,
+    href: buildDocEntryHref(doc),
+  })),
+)
+  .replace(/</g, '\\u003c')
+  .replace(/\u2028/g, '\\u2028')
+  .replace(/\u2029/g, '\\u2029');
+---
+
+<DocsBaseLayout title="帮助中心" description="NexusMC 帮助中心与文档入口">
+  <main>
+    <section class="docs-help-hero">
+      <div class="docs-help-hero__inner">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <h1 class="docs-help-hero__title mt-3 font-bold leading-[1.08] text-white">我们可以帮您什么？</h1>
+            <p class="mt-3 max-w-[64ch] text-sm leading-7 text-white/80">先从常用文档和核心分类进入，后续这里也可以继续接搜索、反馈和工单入口。</p>
+          </div>
+          <div class="hidden md:flex items-center gap-3">
+            <a href={docsIndexHref} class="docs-help-hero__link">
+              <DocsIcon name="book-open-page-variant" />
+              <span>浏览全部文档</span>
+            </a>
+            <a href="https://www.nexusmc.cn" class="docs-help-hero__link docs-help-hero__link--ghost">
+              <DocsIcon name="open-in-new" />
+              <span>跳转至网站</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="docs-help-search-wrap mt-8" id="docs-help-search">
+          <form class="docs-help-search" action={docsIndexHref} method="get" role="search" autocomplete="off">
+            <DocsIcon name="magnify" class="docs-help-search__icon" />
+            <input
+              class="docs-help-search__input"
+              type="search"
+              name="q"
+              placeholder="搜索帮助中心"
+              aria-label="搜索帮助中心"
+            />
+          </form>
+          <div class="docs-help-search-results hidden" data-search-results></div>
+          <script is:inline type="application/json" id="docs-search-index" set:html={searchIndexJson}></script>
+        </div>
+      </div>
+    </section>
+
+    <section class="docs-shell space-y-6">
+      <section class="docs-help-section">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <h2 class="text-[1.85rem] font-bold text-90">常用文章</h2>
+          <a href={docsIndexHref} class="text-sm font-medium text-[var(--primary)] no-underline">查看全部</a>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          {featuredDocs.map((doc) => (
+            <a href={buildDocEntryHref(doc)} class="card-base docs-help-article no-underline">
+              <DocsIcon name="file-document-outline" class="docs-help-article__icon" />
+              <div>
+                <div class="text-sm font-semibold text-90">{doc.data.title}</div>
+                {doc.data.description && <p class="mt-2 text-sm leading-7 text-60">{doc.data.description}</p>}
+              </div>
+              <DocsIcon name="chevron-right" class="docs-help-arrow" />
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section class="docs-help-section">
+        <div class="mb-4">
+          <h2 class="text-[1.85rem] font-bold text-90">浏览所有类别</h2>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          {groups.map((group) => (
+            <a href={docsIndexHref} class="card-base docs-help-category no-underline">
+              <div class="docs-help-category__badge">
+                <DocsIcon name="folder-outline" />
+                <span>{group.section}</span>
+              </div>
+              <div class="mt-3 text-sm leading-7 text-60">收录 {group.items.length} 篇内容，涵盖 {group.items.map((item) => item.data.title).slice(0, 2).join('、')}。</div>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section class="card-base px-5 py-6 sm:px-7 sm:py-7">
+        <div class="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 class="text-[1.65rem] font-bold text-90">没找到您需要的内容？</h2>
+            <p class="mt-2 text-sm leading-7 text-60">可以先浏览完整目录，也可以回到主站继续查找资源、帖子和说明页面。</p>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <a href={docsIndexHref} class="docs-help-action no-underline">
+              <DocsIcon name="format-list-bulleted" />
+              <span>查看文档目录</span>
+            </a>
+            <a href="https://www.nexusmc.cn" class="docs-help-action docs-help-action--ghost no-underline">
+              <DocsIcon name="open-in-new" />
+              <span>返回主站</span>
+            </a>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+  <script is:inline>
+    (() => {
+      const root = document.getElementById('docs-help-search');
+      const dataNode = document.getElementById('docs-search-index');
+      if (!root || !dataNode) return;
+      const form = root.querySelector('form');
+      const input = root.querySelector('input');
+      const results = root.querySelector('[data-search-results]');
+      if (!form || !input || !results) return;
+
+      let docs = [];
+      try {
+        docs = JSON.parse(dataNode.textContent || '[]');
+      } catch {
+        docs = [];
+      }
+
+      const scoreDoc = (doc, query) => {
+        const q = query.toLowerCase();
+        const title = doc.title.toLowerCase();
+        const desc = doc.description.toLowerCase();
+        const section = doc.section.toLowerCase();
+        let score = 0;
+        if (title.includes(q)) score += title.startsWith(q) ? 6 : 4;
+        if (section.includes(q)) score += 3;
+        if (desc.includes(q)) score += 1;
+        return score;
+      };
+
+      const render = (query) => {
+        const value = query.trim();
+        if (!value) {
+          results.classList.add('hidden');
+          results.innerHTML = '';
+          return [];
+        }
+
+        const matches = docs
+          .map((doc) => ({ ...doc, score: scoreDoc(doc, value) }))
+          .filter((doc) => doc.score > 0)
+          .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, 'zh-CN'))
+          .slice(0, 6);
+
+        if (!matches.length) {
+          results.classList.remove('hidden');
+          results.innerHTML = '<div class="docs-help-search-empty">没有匹配的文档，按回车可前往文档目录继续浏览。</div>';
+          return matches;
+        }
+
+        results.classList.remove('hidden');
+        results.innerHTML = matches
+          .map(
+            (doc) =>
+              `<a class="docs-help-search-result" href="${doc.href}">
+                <div class="docs-help-search-result__title">${doc.title}</div>
+                <div class="docs-help-search-result__meta">${doc.section}${doc.description ? ` · ${doc.description}` : ''}</div>
+              </a>`,
+          )
+          .join('');
+        return matches;
+      };
+
+      let lastMatches = [];
+      input.addEventListener('input', () => {
+        lastMatches = render(input.value);
+      });
+
+      input.addEventListener('focus', () => {
+        if (input.value.trim()) {
+          lastMatches = render(input.value);
+        }
+      });
+
+      document.addEventListener('click', (event) => {
+        if (!root.contains(event.target)) {
+          results.classList.add('hidden');
+        }
+      });
+
+      form.addEventListener('submit', (event) => {
+        const query = input.value.trim();
+        if (!query) return;
+        lastMatches = render(query);
+        if (lastMatches[0]?.href) {
+          event.preventDefault();
+          window.location.href = lastMatches[0].href;
+        }
+      });
+    })();
+  </script>
+</DocsBaseLayout>

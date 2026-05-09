@@ -1,0 +1,41 @@
+---
+import type { DocEntry } from '../lib/docs';
+import DocsIcon from './DocsIcon.astro';
+import { buildDocEntryHref } from '../lib/docs';
+
+interface Group {
+  section: string;
+  items: DocEntry[];
+}
+
+interface Props {
+  groups: Group[];
+  currentSlug?: string;
+}
+
+const { groups, currentSlug = '' } = Astro.props;
+---
+
+<aside class="docs-sidebar card-base p-4 lg:p-5">
+  <div class="docs-sidebar__content space-y-4">
+    {groups.map((group) => (
+      <section>
+        <h2 class="docs-nav-group-title">
+          <DocsIcon name="folder-outline" />
+          <span>{group.section}</span>
+        </h2>
+        <div class="space-y-0.5">
+          {group.items.map((item) => (
+            <a
+              href={buildDocEntryHref(item)}
+              class:list={['page-nav-item docs-sidebar-link flex items-start gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors', item.slug === currentSlug && 'active is-active']}
+            >
+              <DocsIcon name="file-document-outline" class="docs-nav-bullet" />
+              <span class="min-w-0 block text-90">{item.data.title}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
+</aside>

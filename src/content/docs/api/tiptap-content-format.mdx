@@ -1,0 +1,731 @@
+---
+title: 投稿正文 TipTap 内容格式
+description: 说明资源、帖子、找服玩投稿在 API 中如何传正文 content，哪些 TipTap 节点和扩展可用，以及视频投稿当前的字段边界。
+section: API
+order: 15
+---
+
+## 这页解决什么问题
+
+当你通过个人 API 投稿资源、帖子、找服玩时，正文都走同一类富文本字段：
+
+- 资源：`content`
+- 帖子：`content`
+- 找服玩：`content`
+
+这些字段支持直接传 TipTap JSON。也就是说，如果你希望正文里有标题、列表、表格、图片、代码块、折叠块、Mermaid 流程图、数学公式、链接卡片等富文本能力，就不要只传一段普通字符串，而应该传 TipTap 文档对象。
+
+::: important
+视频投稿接口当前没有 `content` 正文字段，只有 `description` 纯文本简介。所以这页的 TipTap 结构说明适用于资源、帖子、找服玩，不适用于视频投稿正文。
+:::
+
+## 先记住两条
+
+### 1. 最推荐直接传 JSON 对象
+
+例如：
+
+```json
+{
+  "title": "示例帖子",
+  "boardId": "general",
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "这是一段正文。" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+接口层允许 `content` 是：
+
+- `object`
+- `string`
+
+但对富文本来说，最稳妥的是直接传 `object`。
+
+### 2. 纯字符串可以用，但只会当纯文本
+
+例如：
+
+```json
+{
+  "content": "# 标题\n\n- 列表 1\n- 列表 2"
+}
+```
+
+这类字符串不会被当作 Markdown 正文渲染。当前前台渲染逻辑会把它视为普通文本，再兜底转成段落。
+
+所以：
+
+- 只是想传一段纯文本，可以直接传字符串
+- 想使用 TipTap 的排版能力，应该传 TipTap JSON
+
+::: caution[不要误以为 raw Markdown 会自动生效]
+编辑器内部虽然支持 Markdown 模式输入，但那是编辑器自己负责把 Markdown 转成 TipTap 文档。API 本身并不会把你传入的普通字符串当 Markdown 解释。
+:::
+
+## 最小可用文档
+
+一个最小正文长这样：
+
+```json
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "你好，世界" }
+      ]
+    }
+  ]
+}
+```
+
+推荐你把所有正文都包装成：
+
+- 根节点：`type: "doc"`
+- 子节点数组：`content: []`
+
+## 富文本正文的共同规则
+
+资源、帖子、找服玩三类投稿的正文在服务端都按统一思路处理：
+
+- 正式投稿时会按正文纯文本长度做最小字数校验
+- 提取摘要时会从 TipTap JSON 里抽纯文本
+- 提取图集时会从 TipTap JSON 里扫描图片节点
+- `@提及` 会从 TipTap JSON 里的 `mention` 节点里识别
+
+也就是说，传结构化 JSON 不只是“前台好看”，它还会影响：
+
+- 正文字数统计
+- 首图提取
+- 提及通知
+- 后续展示一致性
+
+## 常用节点速查
+
+下面这些是正文里最常用的节点类型。
+
+| 能力 | 节点 / 标记 |
+| --- | --- |
+| 普通段落 | `paragraph` |
+| 标题 | `heading` |
+| 粗体 / 斜体 / 删除线 / 行内代码 | `text.marks` |
+| 链接 | `link` mark |
+| 引用 | `blockquote` |
+| 无序 / 有序列表 | `bulletList` / `orderedList` / `listItem` |
+| 任务列表 | `taskList` / `taskItem` |
+| 分割线 | `horizontalRule` |
+| 代码块 | `codeBlock` |
+| 图片 | `image` |
+| 表格 | `table` / `tableRow` / `tableHeader` / `tableCell` |
+| @提及 | `mention` |
+| 表情 | `emoji` |
+| 折叠块 | `collapse` |
+| Mermaid 流程图 | `mermaidDiagram` |
+| 数学公式 | `math` |
+| 动态图 | `dynamicImage` |
+| Bilibili 嵌入视频 | `bilibiliVideo` |
+| 链接卡片 | `linkCardInline` / `linkCardBlock` |
+
+## 常见 JSON 片段
+
+### 段落
+
+```json
+{
+  "type": "paragraph",
+  "content": [
+    { "type": "text", "text": "这里是一段普通正文。" }
+  ]
+}
+```
+
+### 标题
+
+```json
+{
+  "type": "heading",
+  "attrs": { "level": 2 },
+  "content": [
+    { "type": "text", "text": "安装说明" }
+  ]
+}
+```
+
+### 粗体、斜体、链接
+
+```json
+{
+  "type": "paragraph",
+  "content": [
+    { "type": "text", "text": "请先阅读 " },
+    {
+      "type": "text",
+      "text": "服务端配置文档",
+      "marks": [
+        {
+          "type": "link",
+          "attrs": { "href": "https://example.com/docs" }
+        }
+      ]
+    },
+    { "type": "text", "text": "，其中 " },
+    {
+      "type": "text",
+      "text": "version",
+      "marks": [{ "type": "code" }]
+    },
+    { "type": "text", "text": " 字段必须填写。" }
+  ]
+}
+```
+
+### 无序列表
+
+```json
+{
+  "type": "bulletList",
+  "content": [
+    {
+      "type": "listItem",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [{ "type": "text", "text": "支持 Fabric" }]
+        }
+      ]
+    },
+    {
+      "type": "listItem",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [{ "type": "text", "text": "支持 1.20.1" }]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 任务列表
+
+```json
+{
+  "type": "taskList",
+  "content": [
+    {
+      "type": "taskItem",
+      "attrs": { "checked": true },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [{ "type": "text", "text": "已安装依赖" }]
+        }
+      ]
+    },
+    {
+      "type": "taskItem",
+      "attrs": { "checked": false },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [{ "type": "text", "text": "等待重启服务器" }]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 代码块
+
+```json
+{
+  "type": "codeBlock",
+  "attrs": { "language": "json" },
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"debug\": true,\n  \"port\": 25565\n}"
+    }
+  ]
+}
+```
+
+### 图片
+
+```json
+{
+  "type": "image",
+  "attrs": {
+    "src": "https://www.nexusmc.cn/uploads/example.png",
+    "alt": "功能截图",
+    "title": "功能截图",
+    "width": "720px",
+    "height": "405px",
+    "style": "width:720px;height:405px;"
+  }
+}
+```
+
+::: tip
+如果你只是做 API 投稿，不一定要手写 `width / height / style`。最小可用图片通常只需要 `src`、`alt`、`title`。
+:::
+
+### 表格
+
+```json
+{
+  "type": "table",
+  "content": [
+    {
+      "type": "tableRow",
+      "content": [
+        {
+          "type": "tableHeader",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "项目" }]
+            }
+          ]
+        },
+        {
+          "type": "tableHeader",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "说明" }]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "tableRow",
+      "content": [
+        {
+          "type": "tableCell",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "平台" }]
+            }
+          ]
+        },
+        {
+          "type": "tableCell",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "Fabric / Forge" }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### @提及
+
+项目里的提及节点格式是：
+
+```json
+{
+  "type": "mention",
+  "attrs": {
+    "id": "user_id",
+    "label": "用户名"
+  }
+}
+```
+
+如果你自己拼装 JSON，这两个属性至少要保证：
+
+- `id`：被提及用户 ID
+- `label`：被提及用户名
+
+### 折叠块
+
+```json
+{
+  "type": "collapse",
+  "attrs": {
+    "summary": "展开查看兼容性说明",
+    "open": false
+  },
+  "content": [
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "该版本暂不兼容旧版存档，请先备份世界。" }
+      ]
+    }
+  ]
+}
+```
+
+### Mermaid 流程图
+
+```json
+{
+  "type": "mermaidDiagram",
+  "attrs": {
+    "code": "flowchart TD\n  A[下载资源] --> B[安装依赖]\n  B --> C[启动游戏]"
+  }
+}
+```
+
+::: note
+当前项目里的 Mermaid 校验只接受第一版的 `flowchart` / `graph` 流程图语法。
+:::
+
+### 数学公式
+
+块级公式：
+
+```json
+{
+  "type": "math",
+  "attrs": {
+    "latex": "E = mc^2",
+    "inline": false
+  }
+}
+```
+
+行内公式：
+
+```json
+{
+  "type": "math",
+  "attrs": {
+    "latex": "a^2+b^2=c^2",
+    "inline": true
+  }
+}
+```
+
+### 动态图
+
+```json
+{
+  "type": "dynamicImage",
+  "attrs": {
+    "src": "https://example.com/live-status.png",
+    "alt": "实时状态图",
+    "title": "实时状态图",
+    "width": "100%",
+    "height": "auto",
+    "refreshOnLoad": true,
+    "showRefreshButton": true
+  }
+}
+```
+
+### Bilibili 视频嵌入
+
+```json
+{
+  "type": "bilibiliVideo",
+  "attrs": {
+    "bvid": "BV1xx411c7mD",
+    "page": 1
+  }
+}
+```
+
+### 链接卡片
+
+行内卡片：
+
+```json
+{
+  "type": "linkCardInline",
+  "attrs": {
+    "url": "https://example.com",
+    "title": "项目主页",
+    "description": "查看完整文档与下载说明",
+    "image": "https://example.com/cover.png",
+    "siteName": "Example",
+    "favicon": "https://example.com/favicon.ico",
+    "variant": "inline"
+  }
+}
+```
+
+块级卡片：
+
+```json
+{
+  "type": "linkCardBlock",
+  "attrs": {
+    "url": "https://example.com",
+    "title": "项目主页",
+    "description": "查看完整文档与下载说明",
+    "image": "https://example.com/cover.png",
+    "siteName": "Example",
+    "favicon": "https://example.com/favicon.ico",
+    "variant": "normal"
+  }
+}
+```
+
+## 一个完整正文示例
+
+下面是一个同时包含标题、段落、列表、图片和代码块的 `content`：
+
+```json
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "heading",
+      "attrs": { "level": 2 },
+      "content": [{ "type": "text", "text": "功能介绍" }]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "这是一个适用于 1.20.1 的资源示例，支持多人联机与自定义配置。" }
+      ]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "支持 Fabric / Forge" }]
+            }
+          ]
+        },
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "支持服务器与单人模式" }]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "image",
+      "attrs": {
+        "src": "https://www.nexusmc.cn/uploads/example-preview.png",
+        "alt": "预览图",
+        "title": "预览图"
+      }
+    },
+    {
+      "type": "codeBlock",
+      "attrs": { "language": "bash" },
+      "content": [
+        {
+          "type": "text",
+          "text": "java -jar server.jar nogui"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## 资源 / 帖子 / 找服玩请求示例
+
+### 资源投稿
+
+```json
+{
+  "title": "示例资源",
+  "description": "用于演示 TipTap 正文结构。",
+  "platform": "java",
+  "category": "resource-pack",
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "安装方法" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "将压缩包放入 resourcepacks 文件夹后重启游戏。" }]
+      }
+    ]
+  },
+  "downloadType": "external",
+  "fileUrl": "https://example.com/download.zip"
+}
+```
+
+### 帖子投稿
+
+```json
+{
+  "title": "示例帖子",
+  "boardId": "general",
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "大家好，这是通过 API 发布的一篇富文本帖子。" }]
+      },
+      {
+        "type": "blockquote",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [{ "type": "text", "text": "引用块也可以直接写进正文 JSON。" }]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 找服玩投稿
+
+```json
+{
+  "title": "示例生存服",
+  "description": "长期开放，偏原版生存体验。",
+  "category": "survival",
+  "ip": "play.example.com",
+  "onlineMode": true,
+  "networkEnvironments": ["mainland"],
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "服务器特色" }]
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": "长期存档，不删档" }]
+              }
+            ]
+          },
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": "轻度插件，保留原版体验" }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## 视频投稿的字段边界
+
+当前视频投稿接口没有正文 `content` 字段。可用的是：
+
+- `sourceUrl`
+- `title`
+- `description`
+- `categoryId`
+- `coverImage`
+- `tags`
+
+也就是说：
+
+- 视频投稿里的 `description` 是纯文本
+- 不能给视频投稿直接传 TipTap 正文
+
+如果未来视频接口新增 `content`，大概率会复用这页说明的同一种 TipTap 文档格式。
+
+## 最佳实践
+
+### 优先让编辑器生成 JSON，不要手写复杂结构
+
+如果只是简单段落、标题、列表，手写还算可控。  
+但表格、折叠块、Mermaid、链接卡片这类复杂节点，更建议：
+
+1. 在站内编辑器里先排好版
+2. 观察实际提交的 `content`
+3. 再让你的脚本按同样结构生成
+
+这样最不容易因为节点层级或 attrs 写错而导致渲染异常。
+
+### 尽量传对象，不要把 JSON 再包成字符串
+
+推荐：
+
+```json
+{
+  "content": {
+    "type": "doc",
+    "content": []
+  }
+}
+```
+
+不推荐：
+
+```json
+{
+  "content": "{\"type\":\"doc\",\"content\":[]}"
+}
+```
+
+虽然两者都能被接口接收，但前者更清晰，也更不容易因为转义问题出错。
+
+### 不要把视频简介误当正文编辑器
+
+当前视频投稿只有 `description`，没有帖子 / 资源 / 找服玩那样的 `content` 正文字段。  
+所以视频同步脚本不需要生成 TipTap JSON。
+
+## 常见问题
+
+### `content` 传字符串为什么没有标题和列表效果？
+
+因为当前普通字符串不会被当 Markdown 渲染。  
+要想出现标题、列表、表格等效果，请传 TipTap JSON。
+
+### `content` 可以传 JSON 字符串吗？
+
+可以，接口层接受 `string` 或 `object`。  
+但如果你传的是字符串，最稳妥的情况也应该是“字符串内容本身就是合法的 TipTap JSON”。
+
+### 为什么正式投稿时提示正文太短？
+
+服务端会从 TipTap JSON 里提取纯文本再计算字数。  
+所以单纯堆很多空节点、空表格、空图片，不会让“正文长度”变长。
+
+### 我的视频投稿为什么不能传 `content`？
+
+因为当前视频投稿接口本身就没有这个字段。  
+视频区目前是视频源链接 + 标题 + 纯文本简介的模型，不是富文本正文模型。

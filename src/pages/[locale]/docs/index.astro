@@ -1,0 +1,94 @@
+---
+import { getCollection } from 'astro:content';
+import DocsBaseLayout from '../../../layouts/DocsBaseLayout.astro';
+import DocsIcon from '../../../components/DocsIcon.astro';
+import {
+  DEFAULT_DOC_LOCALE,
+  DOC_LOCALES,
+  buildDocEntryHref,
+  filterPublicDocsByLocale,
+  groupDocs,
+  sortDocs,
+  type DocEntry,
+  type DocLocale,
+} from '../../../lib/docs';
+
+export async function getStaticPaths() {
+  const allDocs = await getCollection('docs');
+  return DOC_LOCALES
+    .filter((locale) => locale.code !== DEFAULT_DOC_LOCALE)
+    .flatMap((locale) => {
+      const docs = sortDocs(filterPublicDocsByLocale(allDocs, locale.code));
+      if (!docs.length) return [];
+      return [{
+        params: { locale: locale.pathPrefix },
+        props: { locale: locale.code, docs },
+      }];
+    });
+}
+
+const { locale, docs } = Astro.props as { locale: DocLocale; docs: DocEntry[] };
+const groups = groupDocs(docs);
+---
+
+<DocsBaseLayout title="文档目录" description="NexusMC 文档中心目录" locale={locale}>
+  <main class="docs-shell">
+    <section class="docs-page-grid grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <aside class="docs-sidebar card-base p-4 lg:p-5">
+        <div class="docs-sidebar__content space-y-4">
+          {groups.map((group) => (
+            <section>
+              <h2 class="docs-nav-group-title">
+                <DocsIcon name="folder-outline" />
+                <span>{group.section}</span>
+              </h2>
+              <div class="space-y-0.5">
+                {group.items.map((item) => (
+                  <a href={buildDocEntryHref(item)} class="page-nav-item docs-sidebar-link flex items-start gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors">
+                    <DocsIcon name="file-document-outline" class="docs-nav-bullet" />
+                    <span class="min-w-0 block text-90">{item.data.title}</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </aside>
+
+      <div class="docs-content-card card-base px-5 py-6 sm:px-7 sm:py-7">
+        <div class="mb-5">
+          <div class="docs-kicker docs-kicker--icon mb-2">
+            <DocsIcon name="format-list-bulleted" />
+            <span>Sections</span>
+          </div>
+          <h2 class="text-2xl font-bold text-90">文档目录</h2>
+          <p class="mt-2 max-w-[72ch] text-sm leading-7 text-60">这里汇总接口、投稿流程、资源规范等文档，适合按分类继续深入阅读。</p>
+        </div>
+        <div class="space-y-6">
+          {groups.map((group) => (
+            <section class="border-b pb-5 last:border-b-0 last:pb-0" style="border-color:var(--line-divider);">
+              <div class="mb-3 flex items-center justify-between gap-3">
+                <h3 class="docs-section-heading text-lg font-semibold text-90">
+                  <DocsIcon name="folder-outline" />
+                  <span>{group.section}</span>
+                </h3>
+                <span class="rounded-full px-2.5 py-1 text-xs text-50" style="background:color-mix(in srgb, var(--btn-regular-bg) 88%, transparent);">{group.items.length} 篇</span>
+              </div>
+              <div class="space-y-1">
+                {group.items.map((item) => (
+                  <a href={buildDocEntryHref(item)} class="page-nav-item docs-sidebar-link flex items-start gap-3 rounded-lg px-3 py-3 transition-colors">
+                    <DocsIcon name="file-document-outline" class="docs-nav-bullet" />
+                    <span class="min-w-0">
+                      <div class="text-sm font-medium text-90">{item.data.title}</div>
+                      {item.data.description && <div class="mt-1 text-xs leading-6 text-50">{item.data.description}</div>}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    </section>
+  </main>
+</DocsBaseLayout>
