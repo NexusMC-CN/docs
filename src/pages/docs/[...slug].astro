@@ -1,7 +1,7 @@
 ---
 import { getCollection, render } from 'astro:content';
 import DocsPageLayout from '../../layouts/DocsPageLayout.astro';
-import { DEFAULT_DOC_LOCALE, filterPublicDocsByLocale, stripDocLocalePrefix } from '../../lib/docs';
+import { DEFAULT_DOC_LOCALE, buildDocHref, filterPublicDocsByLocale, stripDocLocalePrefix } from '../../lib/docs';
 
 export async function getStaticPaths() {
   const docs = filterPublicDocsByLocale(await getCollection('docs'), DEFAULT_DOC_LOCALE);
@@ -11,8 +11,12 @@ export async function getStaticPaths() {
   }));
 }
 
-const { entry } = Astro.props;
 const allDocs = (await getCollection('docs')).filter((item) => !item.data.draft);
+const slugParam = String(Astro.params.slug || '').replace(/^\/+|\/+$/g, '');
+const entry = Astro.props.entry || allDocs.find((item) => buildDocHref(item.slug, DEFAULT_DOC_LOCALE) === `/docs/${slugParam}`);
+if (!entry) {
+  return Astro.redirect('/docs');
+}
 const { Content, headings } = await render(entry);
 ---
 

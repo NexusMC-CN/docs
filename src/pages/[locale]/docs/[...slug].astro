@@ -4,7 +4,9 @@ import DocsPageLayout from '../../../layouts/DocsPageLayout.astro';
 import {
   DEFAULT_DOC_LOCALE,
   DOC_LOCALES,
+  buildDocHref,
   filterPublicDocsByLocale,
+  normalizeDocLocale,
   stripDocLocalePrefix,
 } from '../../../lib/docs';
 
@@ -24,8 +26,15 @@ export async function getStaticPaths() {
     });
 }
 
-const { entry } = Astro.props;
 const allDocs = (await getCollection('docs')).filter((item) => !item.data.draft);
+const localeParam = String(Astro.params.locale || '').trim();
+const localeMeta = DOC_LOCALES.find((item) => item.pathPrefix === localeParam);
+const locale = normalizeDocLocale(localeMeta?.code || DEFAULT_DOC_LOCALE);
+const slugParam = String(Astro.params.slug || '').replace(/^\/+|\/+$/g, '');
+const entry = Astro.props.entry || allDocs.find((item) => buildDocHref(item.slug, locale) === `/${localeParam}/docs/${slugParam}`);
+if (!entry) {
+  return Astro.redirect(localeMeta?.pathPrefix ? `/${localeMeta.pathPrefix}/docs` : '/docs');
+}
 const { Content, headings } = await render(entry);
 ---
 

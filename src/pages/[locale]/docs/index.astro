@@ -6,8 +6,10 @@ import {
   DEFAULT_DOC_LOCALE,
   DOC_LOCALES,
   buildDocEntryHref,
+  buildDocsIndexHref,
   filterPublicDocsByLocale,
   groupDocs,
+  normalizeDocLocale,
   sortDocs,
   type DocEntry,
   type DocLocale,
@@ -27,7 +29,13 @@ export async function getStaticPaths() {
     });
 }
 
-const { locale, docs } = Astro.props as { locale: DocLocale; docs: DocEntry[] };
+const localeParam = String(Astro.params.locale || '').trim();
+const localeMeta = DOC_LOCALES.find((item) => item.pathPrefix === localeParam);
+const locale = (Astro.props.locale as DocLocale | undefined) || normalizeDocLocale(localeMeta?.code || DEFAULT_DOC_LOCALE);
+const docs = (Astro.props.docs as DocEntry[] | undefined) || sortDocs(filterPublicDocsByLocale(await getCollection('docs'), locale));
+if (!docs.length) {
+  return Astro.redirect(buildDocsIndexHref(DEFAULT_DOC_LOCALE));
+}
 const groups = groupDocs(docs);
 ---
 
