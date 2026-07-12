@@ -8,6 +8,7 @@ const docs = defineCollection({
     section: z.string(),
     locale: z.enum(['zh-CN', 'en']).optional(),
     translationKey: z.string().optional(),
+    sidebarGroup: z.string().optional(),
     order: z.number().default(0),
     draft: z.boolean().default(false),
     toc: z.boolean().default(true),

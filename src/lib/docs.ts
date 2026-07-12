@@ -5,6 +5,27 @@ export type DocLocale = 'zh-CN' | 'en';
 
 export const DEFAULT_DOC_LOCALE: DocLocale = 'zh-CN';
 
+const SECTION_ORDER: Record<string, number> = {
+  '快速开始': 10,
+  '站点机制': 20,
+  '账号与安全': 30,
+  '消息与通知': 40,
+  '投稿流程': 50,
+  '资源规范': 60,
+  '找服玩规范': 65,
+  '内容规范': 67,
+  'API': 70,
+  '主站信息': 80,
+};
+
+const SIDEBAR_GROUP_ORDER: Record<string, number> = {
+  '接入基础': 10,
+  '资源接口': 20,
+  '内容投稿': 30,
+  '正文格式': 40,
+  'OAuth2': 50,
+};
+
 export const DOC_LOCALES: Array<{
   code: DocLocale;
   label: string;
@@ -13,6 +34,33 @@ export const DOC_LOCALES: Array<{
 }> = [
   { code: 'zh-CN', label: '简体中文', htmlLang: 'zh-CN', pathPrefix: '' },
   { code: 'en', label: 'English', htmlLang: 'en', pathPrefix: 'en' },
+];
+
+export const DOCS_PRIMARY_NAV: Array<{
+  label: string;
+  sections: string[];
+  defaultSlug: string;
+}> = [
+  {
+    label: '入门',
+    sections: ['快速开始'],
+    defaultSlug: 'getting-started/overview',
+  },
+  {
+    label: '站点功能',
+    sections: ['站点机制', '账号与安全', '消息与通知', '主站信息'],
+    defaultSlug: 'site-info/site-faq',
+  },
+  {
+    label: '投稿与资源',
+    sections: ['投稿流程', '资源规范', '找服玩规范', '内容规范'],
+    defaultSlug: 'operations/resource-submission-flow',
+  },
+  {
+    label: '开发接入',
+    sections: ['API'],
+    defaultSlug: 'api/personal-api-tokens',
+  },
 ];
 
 const DOC_LOCALE_CODES = new Set<DocLocale>(DOC_LOCALES.map((locale) => locale.code));
@@ -57,6 +105,20 @@ export function buildDocEntryHref(entry: DocEntry) {
   return buildDocHref(entry.slug, getDocLocale(entry));
 }
 
+export function getPrimaryNavForSection(section?: string) {
+  return DOCS_PRIMARY_NAV.find((item) => section && item.sections.includes(section)) || null;
+}
+
+export function buildPrimaryNavHref(item: typeof DOCS_PRIMARY_NAV[number], locale: DocLocale = DEFAULT_DOC_LOCALE) {
+  return buildDocHref(item.defaultSlug, locale);
+}
+
+export function filterDocsByPrimaryNav(entries: DocEntry[], section?: string) {
+  const currentNav = getPrimaryNavForSection(section);
+  if (!currentNav) return entries;
+  return entries.filter((entry) => currentNav.sections.includes(entry.data.section));
+}
+
 export function filterPublicDocsByLocale(entries: DocEntry[], locale: DocLocale = DEFAULT_DOC_LOCALE) {
   return entries.filter((entry) => !entry.data.draft && getDocLocale(entry) === locale);
 }
@@ -70,6 +132,11 @@ export function sortDocs(entries: DocEntry[]) {
     const localeCompare = getDocLocale(a).localeCompare(getDocLocale(b));
     if (localeCompare !== 0) return localeCompare;
     if (a.data.section !== b.data.section) {
+      const aSectionOrder = SECTION_ORDER[a.data.section] ?? Number.MAX_SAFE_INTEGER;
+      const bSectionOrder = SECTION_ORDER[b.data.section] ?? Number.MAX_SAFE_INTEGER;
+      if (aSectionOrder !== bSectionOrder) {
+        return aSectionOrder - bSectionOrder;
+      }
       return a.data.section.localeCompare(b.data.section, 'zh-CN');
     }
     if (a.data.order !== b.data.order) {
@@ -79,15 +146,26 @@ export function sortDocs(entries: DocEntry[]) {
   });
 }
 
+function getSidebarGroup(entry: DocEntry) {
+  return entry.data.sidebarGroup || entry.data.section;
+}
+
 export function groupDocs(entries: DocEntry[]) {
   const groups = new Map<string, DocEntry[]>();
   for (const entry of sortDocs(entries)) {
-    const key = entry.data.section;
+    const key = getSidebarGroup(entry);
     const list = groups.get(key) || [];
     list.push(entry);
     groups.set(key, list);
   }
-  return Array.from(groups.entries()).map(([section, items]) => ({ section, items }));
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => {
+      const aOrder = SIDEBAR_GROUP_ORDER[a] ?? Number.MAX_SAFE_INTEGER;
+      const bOrder = SIDEBAR_GROUP_ORDER[b] ?? Number.MAX_SAFE_INTEGER;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.localeCompare(b, 'zh-CN');
+    })
+    .map(([section, items]) => ({ section, items }));
 }
 
 export function getPrevNext(entries: DocEntry[], slug: string) {

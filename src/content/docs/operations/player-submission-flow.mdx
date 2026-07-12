@@ -13,6 +13,14 @@ order: 8
 找服玩投稿展示的是服务器信息，不是广告位。标题、截图和正文都应能被实际连接结果验证。
 :::
 
+## 发布资格
+
+正式提交找服玩服务器前，账号需要通过开发者考试并确认当前版本的创作者协议。个人认证、组织认证或 Token scope 都不能替代这项发布资格。
+
+完整开通流程见 [创作者开通与协议确认](/docs/site-info/creator-onboarding/)。
+
+首次发布前建议同时阅读 [找服玩首发规范](/docs/standards/player-publish-spec/)；需要关联加入、安装或白名单教程时，参见 [找服玩教程编写规范](/docs/standards/player-tutorial-style-guide/)。
+
 ## 状态流转
 
 | 状态 | 说明 |
@@ -113,6 +121,8 @@ order: 8
 | 请选择是否开启正版验证 | `onlineMode` 不是布尔值。 | 明确传 `true` 或 `false`。 |
 | 请至少选择一个网络环境 | `networkEnvironments` 为空。 | 至少选择一个网络环境。 |
 | 服务器地址无效 | 地址或端口校验失败。 | 检查域名、IP 和端口。 |
+| `CREATOR_EXAM_REQUIRED` | 开发者考试尚未达到发布门槛。 | 前往考试中心完成开发者考试。 |
+| `CREATOR_AGREEMENT_REQUIRED` | 尚未确认当前版本的创作者协议。 | 前往创作者中心阅读并确认协议。 |
 | 个人 Token 只能编辑自己的投稿 | 目标投稿作者不是当前用户。 | 使用作者账号操作。 |
 
 :::

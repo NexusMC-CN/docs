@@ -1,0 +1,41 @@
+---
+interface Props {
+  method: string;
+  path: string;
+  scope?: string;
+  contentType?: string;
+  auth?: string;
+}
+
+const { method, path, scope, contentType, auth } = Astro.props;
+const methodTone = method.trim().split(/\s|\/+/)[0]?.toLowerCase() || 'neutral';
+---
+
+<div class="docs-endpoint">
+  <div class="docs-endpoint__line">
+    <span class:list={['docs-api-method', `docs-api-method--${methodTone}`]}>{method}</span>
+    <code class="docs-endpoint__path">{path}</code>
+  </div>
+  {(scope || contentType || auth) && (
+    <div class="docs-endpoint__meta">
+      {scope && (
+        <span class="docs-endpoint__meta-item">
+          <span>需要权限</span>
+          <code>{scope}</code>
+        </span>
+      )}
+      {contentType && (
+        <span class="docs-endpoint__meta-item">
+          <span>请求类型</span>
+          <code>{contentType}</code>
+        </span>
+      )}
+      {auth && (
+        <span class="docs-endpoint__meta-item">
+          <span>认证方式</span>
+          <code>{auth}</code>
+        </span>
+      )}
+    </div>
+  )}
+</div>

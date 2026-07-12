@@ -15,7 +15,7 @@ interface Props {
 const { headings = [], compact = false } = Astro.props;
 ---
 
-<aside class:list={[compact ? 'docs-inline-outline' : 'docs-outline-panel']}>
+<aside class:list={[compact ? 'docs-inline-outline' : 'docs-outline-panel']} data-docs-outline>
   <div class="docs-kicker docs-kicker--icon mb-3">
     <DocsIcon name="format-list-bulleted" />
     <span>本页目录</span>
@@ -28,6 +28,8 @@ const { headings = [], compact = false } = Astro.props;
           <a
             href={`#${item.slug}`}
             class="docs-outline-link px-3 py-2"
+            data-outline-link
+            data-outline-slug={item.slug}
             style={`padding-left:${0.75 + Math.max(0, item.depth - 2) * 0.85}rem`}
           >
             <DocsIcon name="chevron-right" class="docs-outline-link__chevron" />

@@ -3,6 +3,8 @@ import { getCollection, render } from 'astro:content';
 import DocsPageLayout from '../../layouts/DocsPageLayout.astro';
 import { DEFAULT_DOC_LOCALE, buildDocHref, filterPublicDocsByLocale, stripDocLocalePrefix } from '../../lib/docs';
 
+export const prerender = true;
+
 export async function getStaticPaths() {
   const docs = filterPublicDocsByLocale(await getCollection('docs'), DEFAULT_DOC_LOCALE);
   return docs.map((entry) => ({

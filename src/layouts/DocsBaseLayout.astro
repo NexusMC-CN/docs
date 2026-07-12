@@ -1,18 +1,28 @@
 ---
+import { ClientRouter } from 'astro:transitions';
 import '../styles/docs.css';
 import DocsIcon from '../components/DocsIcon.astro';
-import { buildDocsIndexHref, DEFAULT_DOC_LOCALE, getDocLocaleMeta, type DocLocale } from '../lib/docs';
+import {
+  buildDocsIndexHref,
+  buildPrimaryNavHref,
+  DEFAULT_DOC_LOCALE,
+  DOCS_PRIMARY_NAV,
+  getDocLocaleMeta,
+  type DocLocale,
+} from '../lib/docs';
 
 interface Props {
   title: string;
   description?: string;
   locale?: DocLocale;
+  currentSection?: string;
 }
 
 const {
   title,
   description = '论坛文档中心',
   locale = DEFAULT_DOC_LOCALE,
+  currentSection = '',
 } = Astro.props;
 const mainSiteUrl = process.env.DOCS_MAIN_SITE_URL || process.env.SITE_URL || 'https://www.nexusmc.cn';
 const localeMeta = getDocLocaleMeta(locale);
@@ -21,6 +31,7 @@ const browserTitle = title === '帮助中心'
   : title
     ? `${title} - NexusMC 帮助中心`
     : 'NexusMC 帮助中心与文档入口';
+const activePrimaryNav = DOCS_PRIMARY_NAV.find((item) => item.sections.includes(currentSection));
 ---
 
 <!DOCTYPE html>
@@ -28,6 +39,7 @@ const browserTitle = title === '帮助中心'
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <ClientRouter />
     <title>{browserTitle}</title>
     <meta name="description" content={description} />
     <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -63,15 +75,84 @@ const browserTitle = title === '帮助中心'
           </a>
         </nav>
       </div>
+      <nav class="docs-primary-nav" aria-label="文档分区">
+        <div class="docs-primary-nav__inner">
+          {DOCS_PRIMARY_NAV.map((item) => (
+            <a
+              href={buildPrimaryNavHref(item, locale)}
+              class:list={['docs-primary-nav__link', activePrimaryNav?.label === item.label && 'is-active']}
+            >
+              {item.label}
+            </a>
+          ))}
+        </div>
+      </nav>
     </header>
     <slot />
     <footer class="docs-footer mx-auto max-w-[1440px] px-4 pb-4 pt-4 sm:px-5 lg:px-6">
       <div class="docs-footer-note rounded-[1.25rem] border px-5 py-4 text-sm text-50" style="border-color:var(--line-divider); background:color-mix(in srgb, var(--card-bg) 86%, transparent);">
-        <DocsIcon name="book-open-page-variant" />
-        <span>文档系统独立于论坛主站构建，内容使用 MDX 编写，界面延续论坛主题变量与阅读风格。</span>
+        <div class="docs-footer-meta">
+          <span>Copyright © 2026 NexusMC</span>
+          <span class="docs-footer-sep">/</span>
+          <a href={`${mainSiteUrl}/about`} class="docs-footer-link">关于我们</a>
+          <span class="docs-footer-sep">/</span>
+          <a href={`${mainSiteUrl}/contact`} class="docs-footer-link">联系我们</a>
+          <span class="docs-footer-sep">/</span>
+          <a href={`${mainSiteUrl}/logs`} class="docs-footer-link">开发日志</a>
+          <span class="docs-footer-sep">/</span>
+          <a href={`${mainSiteUrl}/friend-links`} class="docs-footer-link">友情链接</a>
+          <span class="docs-footer-sep">/</span>
+          <a href={buildDocsIndexHref(locale)} class="docs-footer-link">文档中心</a>
+          <span class="docs-footer-sep">/</span>
+        </div>
+        <div class="docs-footer-beian-group">
+          <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="docs-footer-beian">
+            <img src="/icon/icp.svg" alt="ICP 备案" class="docs-footer-beian__icon" />
+            <span>鲁ICP备2026010571号-5</span>
+          </a>
+          <p>|</p>
+          <a href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=37021102001651" target="_blank" rel="noopener noreferrer" class="docs-footer-beian">
+            <img src="/icon/police.svg" alt="公安备案" class="docs-footer-beian__icon" />
+            <span>鲁公网安备37021102001651号</span>
+          </a>
+        </div>
       </div>
     </footer>
     <script is:inline>
+      const DOCS_SIDEBAR_SCROLL_KEY = 'docs:sidebar-scroll-top';
+
+      const getDocsSidebar = () => document.querySelector('.docs-sidebar');
+
+      const saveDocsSidebarScroll = () => {
+        const sidebar = getDocsSidebar();
+        if (!(sidebar instanceof HTMLElement)) return;
+        sessionStorage.setItem(DOCS_SIDEBAR_SCROLL_KEY, String(sidebar.scrollTop || 0));
+      };
+
+      const restoreDocsSidebarScroll = () => {
+        const sidebar = getDocsSidebar();
+        if (!(sidebar instanceof HTMLElement)) return;
+        const raw = sessionStorage.getItem(DOCS_SIDEBAR_SCROLL_KEY);
+        if (!raw) return;
+        const nextTop = Number(raw);
+        if (!Number.isFinite(nextTop)) return;
+        sidebar.scrollTop = nextTop;
+      };
+
+      document.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+        const sidebarLink = target?.closest('.docs-sidebar a[href]');
+        if (sidebarLink) {
+          saveDocsSidebarScroll();
+        }
+      });
+
+      window.addEventListener('beforeunload', saveDocsSidebarScroll);
+      document.addEventListener('astro:before-preparation', saveDocsSidebarScroll);
+      document.addEventListener('astro:page-load', () => {
+        requestAnimationFrame(() => restoreDocsSidebarScroll());
+      });
+
       document.addEventListener('click', (event) => {
         const target = event.target instanceof Element ? event.target : event.target?.parentElement;
         const tab = target?.closest('[data-code-group-tab]');
@@ -88,6 +169,96 @@ const browserTitle = title === '帮助中心'
           item.classList.toggle('is-active', item.getAttribute('data-code-group-panel') === index);
         });
       });
+
+      const setupDocsOutlineSpy = () => {
+        const outlines = Array.from(document.querySelectorAll('[data-docs-outline]')).filter((item) => item instanceof HTMLElement);
+        if (!outlines.length) return;
+
+        const headings = Array.from(document.querySelectorAll('article.docs-content-card :where(h2[id], h3[id], h4[id])'));
+        if (!headings.length) return;
+
+        const activeClassName = 'is-active';
+        const scrollActiveLinkIntoView = (outline, link) => {
+          if (!(outline instanceof HTMLElement) || !(link instanceof HTMLElement)) return;
+          if (typeof outline.scrollTo !== 'function') return;
+          const outlineRect = outline.getBoundingClientRect();
+          const linkRect = link.getBoundingClientRect();
+          const nextTop = Math.max(0, linkRect.top - outlineRect.top + outline.scrollTop - (outline.clientHeight / 2) + (link.clientHeight / 2));
+          outline.scrollTo({ top: nextTop, behavior: 'smooth' });
+        };
+
+        const syncOutline = (outline, slug) => {
+          if (!(outline instanceof HTMLElement)) return;
+          const links = Array.from(outline.querySelectorAll('[data-outline-link]'));
+          let activeLink = null;
+          for (const link of links) {
+            const isActive = link.getAttribute('data-outline-slug') === slug;
+            link.classList.toggle(activeClassName, isActive);
+            if (isActive) activeLink = link;
+          }
+          if (activeLink) scrollActiveLinkIntoView(outline, activeLink);
+        };
+
+        const setActive = (slug) => {
+          for (const outline of outlines) {
+            syncOutline(outline, slug);
+          }
+        };
+
+        const slugToLink = new Map();
+        for (const outline of outlines) {
+          for (const link of outline.querySelectorAll('[data-outline-link]')) {
+            const slug = link.getAttribute('data-outline-slug');
+            if (slug && !slugToLink.has(slug)) slugToLink.set(slug, link);
+          }
+        }
+
+        const links = Array.from(slugToLink.values());
+        if (!links.length) return;
+
+        const scrollCurrentHash = (slug) => {
+          if (!slug || !slugToLink.has(slug)) return;
+          setActive(slug);
+        };
+
+        const applyInitialActive = () => {
+          const currentHash = window.location.hash.slice(1);
+          if (currentHash && slugToLink.has(currentHash)) {
+            setActive(currentHash);
+            return;
+          }
+          const firstHeading = headings[0];
+          if (firstHeading?.id) setActive(firstHeading.id);
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+          const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio || a.boundingClientRect.top - b.boundingClientRect.top);
+          const nextHeading = visible[0]?.target;
+          if (nextHeading instanceof HTMLElement && nextHeading.id) {
+            setActive(nextHeading.id);
+          }
+        }, {
+          root: null,
+          rootMargin: '-20% 0px -68% 0px',
+          threshold: [0.1, 0.2, 0.35, 0.5, 0.65, 0.8],
+        });
+
+        headings.forEach((heading) => observer.observe(heading));
+
+        applyInitialActive();
+
+        window.addEventListener('hashchange', () => {
+          scrollCurrentHash(window.location.hash.slice(1));
+        });
+      };
+
+      document.addEventListener('astro:page-load', () => {
+        setupDocsOutlineSpy();
+      });
+
+      setupDocsOutlineSpy();
     </script>
   </body>
 </html>

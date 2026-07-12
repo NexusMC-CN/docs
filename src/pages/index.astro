@@ -29,7 +29,6 @@ const searchIndexJson = JSON.stringify(
         <div class="flex items-center justify-between gap-4">
           <div>
             <h1 class="docs-help-hero__title mt-3 font-bold leading-[1.08] text-white">我们可以帮您什么？</h1>
-            <p class="mt-3 max-w-[64ch] text-sm leading-7 text-white/80">先从常用文档和核心分类进入，后续这里也可以继续接搜索、反馈和工单入口。</p>
           </div>
           <div class="hidden md:flex items-center gap-3">
             <a href={docsIndexHref} class="docs-help-hero__link">
@@ -101,16 +100,12 @@ const searchIndexJson = JSON.stringify(
         <div class="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 class="text-[1.65rem] font-bold text-90">没找到您需要的内容？</h2>
-            <p class="mt-2 text-sm leading-7 text-60">可以先浏览完整目录，也可以回到主站继续查找资源、帖子和说明页面。</p>
+            <p class="mt-2 text-sm leading-7 text-60">请通过邮箱联系我们</p>
           </div>
           <div class="flex flex-wrap gap-3">
-            <a href={docsIndexHref} class="docs-help-action no-underline">
-              <DocsIcon name="format-list-bulleted" />
-              <span>查看文档目录</span>
-            </a>
-            <a href="https://www.nexusmc.cn" class="docs-help-action docs-help-action--ghost no-underline">
-              <DocsIcon name="open-in-new" />
-              <span>返回主站</span>
+            <a href="mailto:contact@geeroam.com" class="docs-help-action docs-help-action--primary no-underline">
+              <DocsIcon name="email-outline" />
+              <span>给我们发送邮件</span>
             </a>
           </div>
         </div>

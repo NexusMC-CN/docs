@@ -5,7 +5,14 @@ import DocsSidebar from '../components/DocsSidebar.astro';
 import DocsOutline from '../components/DocsOutline.astro';
 import DocsPagination from '../components/DocsPagination.astro';
 import type { DocEntry } from '../lib/docs';
-import { buildDocEntryHref, filterPublicDocsByLocale, getDocLocale, getPrevNext, groupDocs } from '../lib/docs';
+import {
+  buildDocEntryHref,
+  filterDocsByPrimaryNav,
+  filterPublicDocsByLocale,
+  getDocLocale,
+  getPrevNext,
+  groupDocs,
+} from '../lib/docs';
 
 interface Props {
   entry: DocEntry;
@@ -16,11 +23,12 @@ interface Props {
 const { entry, allDocs, headings = [] } = Astro.props;
 const locale = getDocLocale(entry);
 const localeDocs = filterPublicDocsByLocale(allDocs, locale);
-const groups = groupDocs(localeDocs);
-const { prev, next } = getPrevNext(localeDocs, entry.slug);
+const currentNavDocs = filterDocsByPrimaryNav(localeDocs, entry.data.section);
+const groups = groupDocs(currentNavDocs);
+const { prev, next } = getPrevNext(currentNavDocs, entry.slug);
 ---
 
-<DocsBaseLayout title={entry.data.title} description={entry.data.description} locale={locale}>
+<DocsBaseLayout title={entry.data.title} description={entry.data.description} locale={locale} currentSection={entry.data.section}>
   <main class="docs-shell docs-shell--article">
     <div class="docs-page-grid docs-page-grid--article grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
       <DocsSidebar groups={groups} currentSlug={entry.slug} />

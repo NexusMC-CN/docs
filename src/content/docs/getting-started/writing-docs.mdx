@@ -449,6 +449,12 @@ npm run dev
 - 表格和代码块在手机宽度下不会撑出横向页面。
 - 站内链接能打开。
 
+## 部署与缓存
+
+文档站是 Astro 服务端输出。部署后，HTML 页面不应该被浏览器、反代或 CDN 长时间强缓存；建议使用 `Cache-Control: public, max-age=0, must-revalidate`。`/_astro/` 下的 CSS、JS 等带 hash 的构建资源可以使用 `public, max-age=31536000, immutable`。
+
+如果访问文档时页面内容还在，但样式和交互全失效，并且开发者工具里出现旧的 `/_astro/*.css` 或 `/_astro/*.js` 资源 `404`，通常是旧 HTML 被缓存了。旧 HTML 引用了上一次构建的 hash 资源，而服务器上只保留了新构建产物。处理方式是刷新 HTML 缓存、检查反代/CDN 的页面缓存规则，并确认应用响应带有正确的 `Cache-Control`。
+
 ## 新文档模板
 
 ```mdx

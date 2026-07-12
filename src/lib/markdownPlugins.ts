@@ -2,6 +2,7 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkMdx from 'remark-mdx';
 import remarkGfm from 'remark-gfm';
+import simpleIcons from '@iconify-json/simple-icons/icons.json';
 
 type MarkdownNode = {
   type: string;
@@ -26,6 +27,16 @@ type VFileLike = {
   value?: unknown;
 };
 
+type IconifyIcon = {
+  body: string;
+  width?: number;
+  height?: number;
+};
+
+type IconifyAlias = Partial<IconifyIcon> & {
+  parent: string;
+};
+
 const CALLOUT_TYPES = new Set(['note', 'info', 'tip', 'important', 'warning', 'caution', 'danger']);
 const CALLOUT_ALIASES = new Map<string, string>([
   ['info', 'note'],
@@ -40,6 +51,49 @@ const DEFAULT_TITLES: Record<string, string> = {
   caution: 'CAUTION',
 };
 
+const CODE_GROUP_ICON_NAMES: Record<string, string> = {
+  bash: 'gnubash',
+  shell: 'gnubash',
+  sh: 'gnubash',
+  zsh: 'gnubash',
+  javascript: 'javascript',
+  js: 'javascript',
+  jsx: 'javascript',
+  python: 'python',
+  py: 'python',
+};
+
+const CODE_GROUP_LANGUAGE_KEYS: Record<string, string> = {
+  bash: 'bash',
+  shell: 'bash',
+  sh: 'bash',
+  zsh: 'bash',
+  javascript: 'javascript',
+  js: 'javascript',
+  jsx: 'javascript',
+  python: 'python',
+  py: 'python',
+};
+
+const CODE_GROUP_LANGUAGE_LABELS: Record<string, string> = {
+  bash: 'Bash',
+  javascript: 'JavaScript',
+  python: 'Python',
+};
+
+const CODE_GROUP_LANGUAGE_COLORS: Record<string, string> = {
+  bash: '#4EAA25',
+  javascript: '#F7DF1E',
+  python: '#3776AB',
+};
+
+const simpleIconsCollection = simpleIcons as unknown as {
+  icons: Record<string, IconifyIcon>;
+  aliases?: Record<string, IconifyAlias>;
+  width?: number;
+  height?: number;
+};
+
 function escapeHtml(value: unknown) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -51,6 +105,42 @@ function escapeHtml(value: unknown) {
 function normalizeCalloutType(type: unknown) {
   const normalized = String(type || '').trim().toLowerCase();
   return CALLOUT_ALIASES.get(normalized) || normalized;
+}
+
+function resolveIcon(iconName: string, depth = 0): IconifyIcon | null {
+  if (depth > 3) return null;
+  const direct = simpleIconsCollection.icons[iconName];
+  if (direct) return direct;
+  const alias = simpleIconsCollection.aliases?.[iconName];
+  if (!alias) return null;
+  const parent = resolveIcon(alias.parent, depth + 1);
+  return parent ? { ...parent, ...alias, parent: undefined } as IconifyIcon : null;
+}
+
+function buildCodeGroupIcon(lang: string) {
+  const normalized = String(lang || '').trim().toLowerCase();
+  const key = normalized ? CODE_GROUP_LANGUAGE_KEYS[normalized] || normalized : '';
+  const iconName = key ? CODE_GROUP_ICON_NAMES[key] : '';
+  if (!iconName) return '';
+  const icon = resolveIcon(iconName);
+  if (!icon) return '';
+  const width = icon.width ?? simpleIconsCollection.width ?? 24;
+  const height = icon.height ?? simpleIconsCollection.height ?? 24;
+  const color = key ? CODE_GROUP_LANGUAGE_COLORS[key] || '' : '';
+  const style = color ? ` style="color:${escapeHtml(color)}"` : '';
+  return `<span class="docs-code-group__icon" aria-hidden="true"${style}><svg viewBox="0 0 ${width} ${height}" fill="currentColor" focusable="false">${icon.body}</svg></span>`;
+}
+
+function buildCodeGroupIconLabel(lang: string) {
+  const normalized = String(lang || '').trim().toLowerCase();
+  const key = normalized ? CODE_GROUP_LANGUAGE_KEYS[normalized] || normalized : '';
+  return key ? CODE_GROUP_LANGUAGE_LABELS[key] || key : '';
+}
+
+function buildCodeGroupTabClass(lang: string) {
+  const normalized = String(lang || '').trim().toLowerCase();
+  const key = normalized ? CODE_GROUP_LANGUAGE_KEYS[normalized] || normalized : '';
+  return key ? ` docs-code-group__tab--${escapeHtml(key)}` : '';
 }
 
 function parseContainerOpener(line: string): ContainerOpener | null {
@@ -104,6 +194,35 @@ function buildDetailsNodes(title: string, innerSource: string): MarkdownNode[] {
     },
     ...children,
     { type: 'html', value: '</div></details>' },
+  ];
+}
+
+function parseEndpointLine(value: unknown) {
+  const text = String(value || '').trim();
+  const match = text.match(/^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+(\S+)$/i);
+  if (!match) return null;
+  return {
+    method: match[1].toUpperCase(),
+    path: match[2],
+  };
+}
+
+function buildEndpointNodes(codeNode: MarkdownNode): MarkdownNode[] | null {
+  if (codeNode.type !== 'code' || String(codeNode.lang || '').toLowerCase() !== 'http') return null;
+  const endpoint = parseEndpointLine(codeNode.value);
+  if (!endpoint) return null;
+
+  return [
+    {
+      type: 'html',
+      value:
+        `<div class="docs-endpoint" data-endpoint data-method="${escapeHtml(endpoint.method)}" data-path="${escapeHtml(endpoint.path)}">` +
+        `<div class="docs-endpoint__line">` +
+        `<span class="docs-api-method docs-api-method--${escapeHtml(endpoint.method.toLowerCase())} docs-endpoint__method">${escapeHtml(endpoint.method)}</span>` +
+        `<code class="docs-endpoint__path">${escapeHtml(endpoint.path)}</code>` +
+        `</div>` +
+        `</div>`,
+    },
   ];
 }
 
@@ -166,10 +285,12 @@ function buildCodeGroupNodes(innerSource: string): MarkdownNode[] {
 
   const tabs = items
     .map((item, index) => {
-      const langLabel = item.lang ? `<span class="docs-code-group__lang">${escapeHtml(item.lang.toUpperCase())}</span>` : '';
+      const icon = item.lang ? buildCodeGroupIcon(item.lang) : '';
+      const iconLabel = item.lang ? buildCodeGroupIconLabel(item.lang) : item.title;
+      const tabLabel = escapeHtml(iconLabel || item.title);
       const active = index === 0 ? ' is-active' : '';
       const selected = index === 0 ? 'true' : 'false';
-      return `<button class="docs-code-group__tab${active}" type="button" role="tab" aria-selected="${selected}" data-code-group-tab="${index}">${langLabel}<span>${escapeHtml(item.title)}</span></button>`;
+      return `<button class="docs-code-group__tab${active}${buildCodeGroupTabClass(item.lang)}" type="button" role="tab" aria-selected="${selected}" aria-label="${tabLabel}" data-code-group-tab="${index}">${icon}<span class="docs-code-group__label">${tabLabel}</span></button>`;
     })
     .join('');
 
@@ -195,6 +316,24 @@ function buildCodeGroupNodes(innerSource: string): MarkdownNode[] {
 
   nodes.push({ type: 'html', value: '</div></div>' });
   return nodes;
+}
+
+function transformEndpointNodes(tree: MarkdownNode) {
+  function visit(parent: MarkdownNode) {
+    if (!Array.isArray(parent.children)) return;
+    for (let index = 0; index < parent.children.length; index += 1) {
+      const child = parent.children[index];
+      const replacement = buildEndpointNodes(child);
+      if (replacement) {
+        parent.children.splice(index, 1, ...replacement);
+        index += replacement.length - 1;
+        continue;
+      }
+      visit(child);
+    }
+  }
+
+  visit(tree);
 }
 
 function parseCustomMarkdown(source: unknown): MarkdownNode[] {
@@ -271,6 +410,7 @@ function parseCustomMarkdown(source: unknown): MarkdownNode[] {
   }
 
   flushNormal(lines.length);
+  transformEndpointNodes({ type: 'root', children: nodes });
   transformGitHubAlerts({ type: 'root', children: nodes });
   transformSpoilers({ type: 'root', children: nodes });
   return nodes;

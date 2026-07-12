@@ -16,26 +16,25 @@ interface Props {
 const { groups, currentSlug = '' } = Astro.props;
 ---
 
-<aside class="docs-sidebar card-base p-4 lg:p-5">
-  <div class="docs-sidebar__content space-y-4">
+<aside class="docs-sidebar card-base p-3 lg:p-4">
+  <div class="docs-sidebar__content">
     {groups.map((group) => (
-      <section>
-        <h2 class="docs-nav-group-title">
+      <details class:list={['docs-sidebar-group', group.items.some((item) => item.slug === currentSlug) && 'is-open']} open={group.items.some((item) => item.slug === currentSlug)}>
+        <summary class="docs-nav-group-title">
           <DocsIcon name="folder-outline" />
           <span>{group.section}</span>
-        </h2>
-        <div class="space-y-0.5">
+        </summary>
+        <div class="docs-sidebar-links">
           {group.items.map((item) => (
             <a
               href={buildDocEntryHref(item)}
-              class:list={['page-nav-item docs-sidebar-link flex items-start gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors', item.slug === currentSlug && 'active is-active']}
+              class:list={['page-nav-item docs-sidebar-link', item.slug === currentSlug && 'active is-active']}
             >
-              <DocsIcon name="file-document-outline" class="docs-nav-bullet" />
-              <span class="min-w-0 block text-90">{item.data.title}</span>
+              <span class="docs-sidebar-link__title">{item.data.title}</span>
             </a>
           ))}
         </div>
-      </section>
+      </details>
     ))}
   </div>
 </aside>

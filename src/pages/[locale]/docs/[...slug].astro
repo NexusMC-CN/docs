@@ -10,6 +10,8 @@ import {
   stripDocLocalePrefix,
 } from '../../../lib/docs';
 
+export const prerender = true;
+
 export async function getStaticPaths() {
   const allDocs = await getCollection('docs');
   return DOC_LOCALES

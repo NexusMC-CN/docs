@@ -1,0 +1,126 @@
+---
+interface Column {
+  key: string;
+  label: string;
+  kind?: 'text' | 'code' | 'badge' | 'chips';
+  align?: 'left' | 'center' | 'right';
+  class?: string;
+}
+
+interface Props {
+  title?: string;
+  description?: string;
+  columns: Column[];
+  rows: Record<string, unknown>[];
+  compact?: boolean;
+}
+
+const {
+  title,
+  description,
+  columns,
+  rows,
+  compact = false,
+} = Astro.props;
+
+const METHOD_TONES: Record<string, string> = {
+  GET: 'get',
+  POST: 'post',
+  PUT: 'put',
+  PATCH: 'patch',
+  DELETE: 'delete',
+  OPTIONS: 'options',
+  HEAD: 'head',
+};
+
+function toText(value: unknown) {
+  if (value === null || value === undefined || value === '') return '—';
+  return String(value);
+}
+
+function getTone(value: unknown) {
+  const method = toText(value).toUpperCase();
+  return METHOD_TONES[method] || 'neutral';
+}
+
+function getColumnClass(column: Column) {
+  return [
+    'docs-api-table__cell',
+    column.class,
+    column.align ? `docs-api-table__cell--${column.align}` : '',
+  ].filter(Boolean).join(' ');
+}
+---
+
+<section class:list={['docs-api-table', compact && 'docs-api-table--compact']}>
+  {(title || description) && (
+    <header class="docs-api-table__header">
+      {title && <h3 class="docs-api-table__title">{title}</h3>}
+      {description && <p class="docs-api-table__description">{description}</p>}
+    </header>
+  )}
+
+  <div class="docs-api-table__scroll" role="region" aria-label={title || 'API table'} tabindex="0">
+    <table class="docs-api-table__grid">
+      <thead>
+        <tr>
+          {columns.map((column) => (
+            <th class:list={['docs-api-table__head', column.class, column.align && `docs-api-table__head--${column.align}`]}>
+              {column.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr>
+            {columns.map((column) => {
+              const value = row[column.key];
+
+              if (column.kind === 'badge') {
+                return (
+                  <td class={getColumnClass(column)}>
+                    <span class:list={['docs-api-method', `docs-api-method--${getTone(value)}`]}>
+                      {toText(value)}
+                    </span>
+                  </td>
+                );
+              }
+
+              if (column.kind === 'chips') {
+                const items = Array.isArray(value) ? value : (value === null || value === undefined || value === '' ? [] : [value]);
+                return (
+                  <td class={getColumnClass(column)}>
+                    <div class="docs-api-table__chips">
+                      {items.length ? items.map((item) => <code class="docs-api-table__chip">{toText(item)}</code>) : <span>—</span>}
+                    </div>
+                  </td>
+                );
+              }
+
+              if (column.kind === 'code') {
+                return (
+                  <td class={getColumnClass(column)}>
+                    <code class="docs-api-table__code">{toText(value)}</code>
+                  </td>
+                );
+              }
+
+              return (
+                <td class={getColumnClass(column)}>
+                  {Array.isArray(value) ? (
+                    <div class="docs-api-table__stack">
+                      {value.map((item) => <span>{toText(item)}</span>)}
+                    </div>
+                  ) : (
+                    <span>{toText(value)}</span>
+                  )}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</section>
