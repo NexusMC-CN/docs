@@ -29,7 +29,7 @@ order: 30
 | `400` | 请求参数或组合规则不合法 | 字段类型、必填项、枚举值、URL、正文和关联 ID。 |
 | `401` | 未认证 | `Authorization: Bearer ...` 是否存在，Token 是否完整、有效或已撤销。 |
 | `403` | 已认证但无权操作 | 权限、内容所有权、组织身份限制和账号安全前置条件。 |
-| `404` | 内容不存在 | ID 是否正确，以及该内容是否属于 Token 用户。 |
+| `404` | 内容不存在 | 用“我的内容”列表接口核对 ID、slug 和当前 Token。 |
 | `409` | 状态冲突 | 自定义路径、重复数据或当前内容状态。 |
 | `413` | 请求体过大 | 文件大小、正文大小和所用上传接口。 |
 | `429` | 请求过于频繁 | 限流响应头和站点发布频率限制。 |
@@ -79,6 +79,26 @@ Authorization: Bearer avm_pat_xxxxx_xxxxx
 - 请求中的内容 ID 是否由当前 Token 用户创建。
 - 是否误用了组织内容或他人的草稿 ID。
 - 是否把列表接口返回的展示 ID 和另一个内容类型的 ID 混用。
+
+## 内容 ID 或 slug 返回 404
+
+四类列表接口会直接返回可用于后续请求的稳定 `id`，无需从网页 URL 获取：
+
+| 内容 | 查询接口 | ID 字段 |
+| --- | --- | --- |
+| 资源 | `GET /api/users/me/resources` | `resources[].id` |
+| 帖子 | `GET /api/users/me/posts` | `posts[].id` |
+| 找服玩 | `GET /api/users/me/players` | `players[].id` |
+| 视频 | `GET /api/users/me/videos` | `videos[].id` |
+
+内容路径同时接受稳定 ID、当前或历史 slug、公开编号和公开链接中的路径段。仍返回 `404` 时依次检查：
+
+1. 查询值是否只是标题或项目名，而不是响应里的 `id` 或 `slug`。
+2. 该内容是否由当前 Token 用户本人创建。
+3. 仓库变量或配置值前后是否有空格、引号或换行。
+4. 是否把资源 ID 用到了帖子、找服玩或视频接口。
+
+GitHub Actions 出现 `NexusMC API request failed with HTTP 404: {"error":"Resource not found"}` 时，通常是资源更新阶段没有解析到 `resource_id`，与前面的构建或文件上传是否成功无关。
 
 ## 创作者发布资格不足
 

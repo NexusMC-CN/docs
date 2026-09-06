@@ -1,6 +1,6 @@
 ---
 title: 个人 API：资源
-description: 查询、创建和更新资源的接口，以及每个请求可直接使用的完整参数表。
+description: 查询、创建和更新资源的接口，以及版本 Tag 和每个请求可直接使用的完整参数表。
 section: API
 sidebarGroup: 资源接口
 order: 10
@@ -19,7 +19,8 @@ import DocsEndpoint from '../../../components/DocsEndpoint.astro';
     { key: 'description', label: '用途' },
   ]}
   rows={[
-  { method: 'GET', path: '/api/resources/{id}/edit', auth: 'resource:read:self', description: '读取自己的资源编辑数据' },
+  { method: 'GET', path: '/api/resources/version-tags', auth: '无需 Token', description: '读取当前可用的资源版本 Tag' },
+  { method: 'GET', path: '/api/resources/{id}/edit/core', auth: 'resource:read:self', description: '读取自己的资源核心编辑数据' },
   { method: 'GET', path: '/api/users/me/resources', auth: 'resource:read:self', description: '分页查询自己的资源' },
   { method: 'POST', path: '/api/resources', auth: 'resource:create', description: '创建资源或保存草稿' },
   { method: 'PUT / PATCH', path: '/api/resources/{id}', auth: 'resource:update:self', description: '更新自己的资源' },
@@ -27,7 +28,7 @@ import DocsEndpoint from '../../../components/DocsEndpoint.astro';
   ]}
 />
 
-`{id}` 可以使用资源 ID。正文 `content` 的结构见 [投稿正文 TipTap 快速接入](/docs/api/tiptap-content-format/)，文件项见 [资源文件与版本](/docs/api/personal-api-resource-files/)。
+`{id}` 推荐使用列表或创建响应返回的稳定资源 ID，也兼容当前或历史 slug、公开编号和公开链接中的路径段。正文 `content` 的结构见 [投稿正文 TipTap 快速接入](/docs/api/tiptap-content-format/)，文件项和版本 Tag 见 [资源文件与版本](/docs/api/personal-api-resource-files/)。
 
 ## 查询自己的资源列表
 
@@ -85,20 +86,22 @@ resources = response.json()
 | `q` | `string` | 否 | 按标题等内容搜索。 |
 | `sort` | `string` | 否 | 排序方式。 |
 
+响应的 `resources[]` 每项都包含 `id`、`slug` 和 `path`。更新或发布版本时直接使用 `resources[].id`，无需查看网页 URL。
+
 读取单项编辑数据：
 
-<DocsEndpoint method="GET" path="/api/resources/{id}/edit" scope="resource:read:self" />
+<DocsEndpoint method="GET" path="/api/resources/{id}/edit/core" scope="resource:read:self" />
 
 ::: code-group
 
 ```bash [bash]
-curl "https://www.nexusmc.cn/api/resources/RESOURCE_ID/edit" \
+curl "https://www.nexusmc.cn/api/resources/RESOURCE_ID/edit/core" \
   -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
   -H "Accept: application/json"
 ```
 
 ```javascript [javascript]
-const response = await fetch('https://www.nexusmc.cn/api/resources/RESOURCE_ID/edit', {
+const response = await fetch('https://www.nexusmc.cn/api/resources/RESOURCE_ID/edit/core', {
   headers: {
     Authorization: `Bearer ${process.env.NEXUSMC_API_TOKEN}`,
     Accept: 'application/json',
@@ -113,7 +116,7 @@ import os
 import requests
 
 response = requests.get(
-    'https://www.nexusmc.cn/api/resources/RESOURCE_ID/edit',
+    'https://www.nexusmc.cn/api/resources/RESOURCE_ID/edit/core',
     headers={
         'Authorization': f"Bearer {os.environ['NEXUSMC_API_TOKEN']}",
         'Accept': 'application/json',
@@ -124,6 +127,27 @@ resource = response.json()
 ```
 
 :::
+
+## 获取可用版本 Tag
+
+<DocsEndpoint method="GET" path="/api/resources/version-tags" />
+
+该接口无需 Token，返回后台当前启用的版本 Tag。客户端在显示发布或更新选项前应先读取本接口，不要假设后台始终只保留默认三项。
+
+```bash
+curl "https://www.nexusmc.cn/api/resources/version-tags" \
+  -H "Accept: application/json"
+```
+
+```json
+[
+  { "key": "alpha", "label": "开发版", "enabled": true, "sortOrder": 0 },
+  { "key": "beta", "label": "测试版", "enabled": true, "sortOrder": 1 },
+  { "key": "releases", "label": "正式版", "enabled": true, "sortOrder": 2 }
+]
+```
+
+提交时传 `key`，例如 `"versionTag": "beta"`。Tag 不存在或已停用时，写接口返回 `400` 和 `所选版本标签不存在或已停用`。
 
 ## 创建资源
 
@@ -158,6 +182,7 @@ resource = response.json()
 | `downloadType` | `string` | 否 | `local` 或 `external`。 |
 | `additionalFiles` | `array` | 否 | 兼容的附加文件列表。 |
 | `version` | `string` | 否 | 初始版本号，最多 50 字符。 |
+| `versionTag` | `string` | 否 | 初始版本 Tag，最多 32 字符；必须是当前启用的 `key`，省略时使用 `releases`。 |
 | `thirdLevelCats` | `string \| array<string>` | 否 | 三级分类。 |
 | `sourceType` | `string` | 否 | 来源类型，最多 20 字符。 |
 | `repositoryUrl` | `string \| null` | 否 | 源代码仓库 URL。 |
@@ -167,6 +192,7 @@ resource = response.json()
 | `attributionType` | `string` | 否 | 归属类型，如原创或转载。 |
 | `originalResourceUrl` | `string \| null` | 否 | 转载时的原资源 URL；转载资源必须填写。 |
 | `originalAuthorName` | `string \| null` | 否 | 原作者名称，最多 120 字符。 |
+| `originalAuthorLabel` | `string \| null` | 否 | 详情页显示的作者称谓，最多 30 字符，例如“主要作者”或“上游作者”；留空时按归属类型自动显示。 |
 | `originalAuthorUrl` | `string \| null` | 否 | 原作者主页 URL。 |
 | `visibility` | `string` | 否 | `public`、`partial` 或 `private`。 |
 | `visibilityAllowUserIds` | `array<string>` | 否 | `partial` 可见用户 ID，最多 100 个。 |
@@ -207,6 +233,7 @@ curl -X POST 'https://www.nexusmc.cn/api/resources' \
     "title": "示例资源",
     "category": "mod",
     "content": {"type":"doc","content":[]},
+    "versionTag": "releases",
     "isDraft": true
   }'
 ```
@@ -222,6 +249,7 @@ const response = await fetch('https://www.nexusmc.cn/api/resources', {
     title: '示例资源',
     category: 'mod',
     content: { type: 'doc', content: [] },
+    versionTag: 'releases',
     isDraft: true,
   }),
 })
@@ -243,6 +271,7 @@ response = requests.post(
         'title': '示例资源',
         'category': 'mod',
         'content': {'type': 'doc', 'content': []},
+        'versionTag': 'releases',
         'isDraft': True,
     },
 )
@@ -286,6 +315,7 @@ created = response.json()
 | `downloadType` | `string` | 否 | `local` 或 `external`。 |
 | `additionalFiles` | `array` | 否 | 兼容的附加文件列表。 |
 | `version` | `string` | 否 | 版本号，最多 50 字符。 |
+| `versionTag` | `string` | 否 | 当前资源或新版本的 Tag，最多 32 字符；必须使用当前启用的 `key`。 |
 | `publishVersion` | `boolean` | 否 | 是否显式创建版本记录。 |
 | `versionTitle` | `string` | 否 | 版本标题，最多 200 字符。 |
 | `changelog` | `object \| string` | 否 | 版本更新说明。 |
@@ -298,6 +328,7 @@ created = response.json()
 | `attributionType` | `string` | 否 | 归属类型。 |
 | `originalResourceUrl` | `string \| null` | 否 | 转载时的原资源 URL。 |
 | `originalAuthorName` | `string \| null` | 否 | 原作者名称。 |
+| `originalAuthorLabel` | `string \| null` | 否 | 详情页显示的作者称谓，最多 30 字符；传空值可恢复自动称谓。 |
 | `originalAuthorUrl` | `string \| null` | 否 | 原作者主页 URL。 |
 | `visibility` | `string` | 否 | `public`、`partial` 或 `private`。 |
 | `visibilityAllowUserIds` | `array<string>` | 否 | `partial` 可见用户 ID，最多 100 个。 |

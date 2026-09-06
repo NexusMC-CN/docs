@@ -20,10 +20,13 @@ const SECTION_ORDER: Record<string, number> = {
 
 const SIDEBAR_GROUP_ORDER: Record<string, number> = {
   '接入基础': 10,
+  '现成工具': 15,
   '资源接口': 20,
   '内容投稿': 30,
   '正文格式': 40,
   'OAuth2': 50,
+  '站点 API': 51,
+  'WebSocket 接口': 52,
 };
 
 export const DOC_LOCALES: Array<{
@@ -39,7 +42,8 @@ export const DOC_LOCALES: Array<{
 export const DOCS_PRIMARY_NAV: Array<{
   label: string;
   sections: string[];
-  defaultSlug: string;
+  defaultSlug?: string;
+  href?: string;
 }> = [
   {
     label: '入门',
@@ -60,6 +64,11 @@ export const DOCS_PRIMARY_NAV: Array<{
     label: '开发接入',
     sections: ['API'],
     defaultSlug: 'api/personal-api-tokens',
+  },
+  {
+    label: '帮助中心',
+    sections: [],
+    href: '/help',
   },
 ];
 
@@ -110,7 +119,8 @@ export function getPrimaryNavForSection(section?: string) {
 }
 
 export function buildPrimaryNavHref(item: typeof DOCS_PRIMARY_NAV[number], locale: DocLocale = DEFAULT_DOC_LOCALE) {
-  return buildDocHref(item.defaultSlug, locale);
+  if (item.href) return item.href;
+  return item.defaultSlug ? buildDocHref(item.defaultSlug, locale) : buildDocsIndexHref(locale);
 }
 
 export function filterDocsByPrimaryNav(entries: DocEntry[], section?: string) {

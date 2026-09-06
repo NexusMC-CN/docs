@@ -18,8 +18,10 @@ import DocsEndpoint from '../../../components/DocsEndpoint.astro';
 - 独立工具或桌面程序的网页登录回调
 - 需要读取 NexusMC 用户基础资料或邮箱资料的服务
 
+服务端应用可以使用传统 `client_secret`，也可以改用更适合生产环境的 [`private_key_jwt` 公钥认证](/docs/api/open-platform-public-key-auth/)。
+
 ::: note
-接入前需要由 NexusMC 管理员先在后台创建一个“本站 OAuth2 应用”，拿到 `client_id` 和 `client_secret`。
+接入前需要先在开放平台创建并通过审核的“本站 OAuth2 应用”。所有应用都会获得 `client_id`；使用 `client_secret_basic` 的应用另有 `client_secret`，使用 `private_key_jwt` 的应用则需要先登记公钥。
 :::
 
 ## Base URL
@@ -39,7 +41,7 @@ https://www.nexusmc.cn/api/oauth2
 | `client_id` | 应用公开标识，例如 `0123abcd...` |
 | `client_secret` | 完整应用密钥，例如 `avm_oac_<client_id>_<secret>`，只会完整展示一次 |
 | `redirect_uri` | 你的回调地址，必须与后台登记值完全一致 |
-| `scope` | 当前支持 `user:basic`、`user:email` |
+| `scope` | 空格分隔的授权范围，完整列表见下方 |
 
 ::: important
 `client_secret` 请使用后台创建应用时显示的完整值，例如 `avm_oac_<client_id>_<secret>`。不要拆分、截断或自行重新拼接。服务端当前兼容裸 secret 是为了照顾历史数据，新接入不要依赖这个兼容行为。
@@ -55,6 +57,10 @@ https://www.nexusmc.cn/api/oauth2
 | --- | --- |
 | `user:basic` | 读取用户 ID、UID、用户名、slug、头像、角色 |
 | `user:email` | 读取邮箱地址与邮箱验证状态 |
+| `user:content:read` | 读取用户本人的四类投稿摘要 |
+| `user:interaction:read` | 读取用户本人的收藏和点赞记录 |
+| `user:notification:read` | 读取用户本人的通知和未读数量 |
+| `user:notification:write` | 将用户本人的通知标记为已读 |
 
 如果请求时不传 `scope`，服务端会按该应用后台已勾选的默认作用域发放授权。
 
@@ -115,7 +121,9 @@ https://example.com/auth/nexusmc/callback?error=access_denied&state=csrf_token_h
 | --- | --- | --- |
 | `grant_type` | 是 | 首次换 Token 时传 `authorization_code` |
 | `client_id` | 是 | 应用 `client_id` |
-| `client_secret` | 是 | 后台显示的完整应用密钥，例如 `avm_oac_<client_id>_<secret>` |
+| `client_secret` | 按鉴权方式 | `client_secret_basic` 应用传后台显示的完整应用密钥；`private_key_jwt` 应用不传 |
+| `client_assertion_type` | 按鉴权方式 | `private_key_jwt` 应用固定传 `urn:ietf:params:oauth:client-assertion-type:jwt-bearer` |
+| `client_assertion` | 按鉴权方式 | `private_key_jwt` 应用使用已登记公钥对应私钥签发的短时 JWT |
 | `code` | 是 | 授权回调带回的授权码 |
 | `redirect_uri` | 是 | 必须与发起授权时一致 |
 
@@ -195,7 +203,9 @@ token = response.json()
 | --- | --- | --- |
 | `grant_type` | 是 | 固定传 `refresh_token` |
 | `client_id` | 是 | 应用 `client_id` |
-| `client_secret` | 是 | 后台显示的完整应用密钥 |
+| `client_secret` | 按鉴权方式 | `client_secret_basic` 应用传后台显示的完整应用密钥；`private_key_jwt` 应用不传 |
+| `client_assertion_type` | 按鉴权方式 | `private_key_jwt` 应用固定传 `urn:ietf:params:oauth:client-assertion-type:jwt-bearer` |
+| `client_assertion` | 按鉴权方式 | `private_key_jwt` 应用使用已登记公钥对应私钥签发的短时 JWT |
 | `refresh_token` | 是 | 上次换到的刷新令牌 |
 
 ::: code-group
@@ -253,6 +263,21 @@ refreshed = refresh_response.json()
 :::
 
 刷新成功后会签发新的 `access_token` 和 `refresh_token`，旧 `refresh_token` 会失效。请保存最新返回值。
+
+## 主动撤销 Token
+
+客户端主动注销或删除本地授权时，可以按 OAuth 2.0 Token Revocation 规范调用撤销接口。服务端会对不存在、已过期或已撤销的 Token 返回相同的成功响应，避免泄露 Token 状态。
+
+<DocsEndpoint method="POST" path="/api/oauth2/revoke" contentType="application/x-www-form-urlencoded" />
+
+```bash
+curl -X POST "https://www.nexusmc.cn/api/oauth2/revoke" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "token=$NEXUSMC_ACCESS_TOKEN" \
+  --data-urlencode "token_type_hint=access_token"
+```
+
+`token_type_hint` 可传 `access_token` 或 `refresh_token`，也可以省略。撤销 Access Token 时，对应的刷新令牌也会一并失效。
 
 ## 获取用户资料
 
@@ -333,7 +358,7 @@ profile = response.json()
 | 作用域不允许 | `invalid_scope` | 请求了应用未开放的作用域 | 调整请求 scope 或后台配置 |
 | 用户拒绝授权 | `access_denied` | 用户在确认页点了拒绝 | 提示用户重新发起登录 |
 | 换 Token 失败 | `invalid_grant` | 授权码已用过、已过期、回调地址不一致，或授权已撤销 | 重新走一遍授权流程 |
-| 客户端认证失败 | `invalid_client` | `client_id` / `client_secret` 不正确 | 检查后台生成的密钥 |
+| 客户端认证失败 | `invalid_client` | `client_id`、`client_secret` 或客户端断言不正确 | 检查当前鉴权方式、密钥、公钥及断言声明 |
 | Token 无效 | `invalid_token` | Access Token 已过期、被撤销或用户状态不可用 | 重新登录并重新授权 |
 
 ## 疑难解答
@@ -344,7 +369,7 @@ profile = response.json()
 
 ### 可以在浏览器前端直接调用 `/token` 吗？
 
-不建议。因为这一步需要使用 `client_secret`，应该始终放在你自己的服务端完成。
+不建议。`client_secret` 和 `private_key_jwt` 的私钥都只能保存在你自己的服务端，不能交给浏览器前端。
 
 ### `client_secret` 应该填哪一段？
 

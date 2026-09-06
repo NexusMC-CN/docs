@@ -1,0 +1,149 @@
+---
+import DocsIcon from './DocsIcon.astro';
+
+interface Props {
+  href: string;
+  title: string;
+  description: string;
+  fileName: string;
+  meta?: string;
+}
+
+const {
+  href,
+  title,
+  description,
+  fileName,
+  meta = 'Word 文档 · DOCX',
+} = Astro.props;
+---
+
+<div class="docs-download">
+  <div class="docs-download__summary">
+    <span class="docs-download__file-icon" aria-hidden="true">
+      <DocsIcon name="file-document-outline" size="1.35rem" />
+    </span>
+    <div class="docs-download__content">
+      <strong class="docs-download__title">{title}</strong>
+      <span class="docs-download__description">{description}</span>
+      <span class="docs-download__meta">{meta}</span>
+    </div>
+  </div>
+  <a
+    class="docs-download__action"
+    href={href}
+    download={fileName}
+    aria-label={`下载${title}`}
+  >
+    <DocsIcon name="download" size="1.1rem" />
+    <span>下载模板</span>
+  </a>
+</div>
+
+<style>
+  .docs-download {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 1.25rem 0 1rem;
+    padding: 1rem;
+    border: 1px solid color-mix(in srgb, var(--line-divider) 92%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--btn-regular-bg) 62%, var(--card-bg));
+  }
+
+  .docs-download__summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    min-width: 0;
+  }
+
+  .docs-download__file-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: 0 0 auto;
+    border-radius: 0.45rem;
+    background: color-mix(in srgb, var(--primary) 12%, var(--card-bg));
+    color: var(--primary);
+  }
+
+  .docs-download__content {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .docs-download__title {
+    color: var(--text-primary);
+    font-size: 0.96rem;
+    line-height: 1.45;
+  }
+
+  .docs-download__description {
+    max-width: 64ch;
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+    line-height: 1.55;
+  }
+
+  .docs-download__meta {
+    color: var(--text-tertiary);
+    font-size: 0.76rem;
+    line-height: 1.45;
+  }
+
+  .docs-download__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 2.65rem;
+    flex: 0 0 auto;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--primary) 42%, #1e40af);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--primary) 42%, #1e40af);
+    color: hsl(var(--hue), 24%, 98%);
+    font-size: 0.88rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .docs-download__action:hover {
+    border-color: color-mix(in srgb, var(--primary-hover) 32%, #18378f);
+    background: color-mix(in srgb, var(--primary-hover) 32%, #18378f);
+    color: hsl(var(--hue), 24%, 98%);
+    transform: translateY(-1px);
+  }
+
+  .docs-download__action:active {
+    transform: translateY(0);
+  }
+
+  @media (max-width: 560px) {
+    .docs-download {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .docs-download__action {
+      width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .docs-download__action {
+      transition: none;
+    }
+  }
+</style>

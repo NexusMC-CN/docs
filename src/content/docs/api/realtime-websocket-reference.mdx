@@ -1,0 +1,136 @@
+---
+title: WebSocket 接口参考
+description: NexusMC 机器人实时接口的完整命令、主题、事件和错误码参考。
+section: API
+sidebarGroup: WebSocket 接口
+order: 91
+---
+
+本文是 `/realtime/v1` 的逐项参考。快速连接示例请先阅读[实时 API：WebSocket 与机器人](/docs/api/realtime-websocket)。所有服务端事件均为统一信封：
+
+```json
+{
+  "id": "evt_xxx",
+  "type": "message.created",
+  "ts": "2026-09-04T08:30:00.000Z",
+  "requestId": "req-1",
+  "payload": {}
+}
+```
+
+## 连接与权限
+
+使用开发者中心创建的 WebSocket Key，通过 `auth.token` 或 `Authorization: Bearer` 连接：
+
+```ts
+const socket = io('https://www.nexusmc.cn/realtime/v1', {
+  auth: { token: process.env.NEXUSMC_WEBSOCKET_KEY },
+  transports: ['websocket'],
+});
+```
+
+连接成功后收到 `ready`。WebSocket Key 必须包含 `bot:realtime:connect`，可选权限为 `bot:chat:subscribe`、`bot:chat:read`、`bot:chat:write`、`bot:chat:moderate`、`bot:dm:read`、`bot:dm:write`、`bot:notification:read` 和 `bot:content:subscribe`。
+
+## 主题订阅
+
+```ts
+socket.emit('subscribe', { requestId: 'sub-1', topic: 'room:ROOM_ID' });
+socket.emit('unsubscribe', { requestId: 'sub-2', topic: 'room:ROOM_ID' });
+```
+
+| 主题 | 用途 | 额外限制 |
+| --- | --- | --- |
+| `room:<id>` | 群聊消息和成员事件 | 机器人必须是群成员 |
+| `conversation:<id>` | 私聊消息事件 | 机器人必须是会话参与者 |
+| `user:<id>` | 用户在线状态 | 只能订阅机器人所属开发者或机器人自身 |
+| `notification:<id>` | 通知事件 | 需要 `bot:notification:read`，且只能访问所属开发者或机器人自身 |
+| `content:resource`、`content:post`、`content:player`、`content:video`、`content:all` | 公开内容变化 | 需要 `bot:content:subscribe` |
+
+## 断线恢复
+
+`ready` 会返回 `latestCursor`。机器人处理事件后发送确认，重连并完成主题订阅后使用 `resume` 补拉遗漏事件：
+
+```ts
+socket.emit('ack', { cursor: 1024 });
+socket.emit('resume', { cursor: 1024, limit: 200 });
+```
+
+事件只会按当前连接已订阅的主题回放。事件存储保留最近 5000 条，游标超出保留窗口时返回 `CURSOR_EXPIRED`，调用方应重新建立全量同步基线。
+
+## 群聊命令
+
+```ts
+socket.emit('room.join', { requestId: 'join-1', inviteCode: 'INVITE_CODE' });
+socket.emit('message.send', { requestId: 'send-1', roomId: 'ROOM_ID', content: '你好' });
+socket.emit('message.read', { requestId: 'read-1', roomId: 'ROOM_ID', limit: 50 });
+socket.emit('message.read', { requestId: 'read-2', roomId: 'ROOM_ID', messageId: 'MESSAGE_ID' });
+socket.emit('message.edit', { requestId: 'edit-1', messageId: 'MESSAGE_ID', content: '修改后的内容' });
+socket.emit('message.recall', { requestId: 'recall-1', messageId: 'MESSAGE_ID' });
+socket.emit('typing.start', { roomId: 'ROOM_ID' });
+socket.emit('typing.stop', { roomId: 'ROOM_ID' });
+socket.emit('room.leave', { roomId: 'ROOM_ID' });
+```
+
+`message.edit` 仅允许发送者在 2 分钟内编辑；`message.recall` 仅允许发送者在 3 分钟内撤回。群管理员命令需要 `bot:chat:moderate`，并遵循站内群主/管理员层级：
+
+```ts
+socket.emit('room.member.role', { roomId: 'ROOM_ID', userId: 'USER_ID', role: 'admin' });
+socket.emit('room.member.remove', { roomId: 'ROOM_ID', userId: 'USER_ID' });
+socket.emit('room.member.mute', { roomId: 'ROOM_ID', userId: 'USER_ID', durationMs: 3600000, reason: '暂时禁言' });
+socket.emit('room.member.unmute', { roomId: 'ROOM_ID', userId: 'USER_ID' });
+```
+
+## 私聊命令
+
+机器人必须先作为参与者存在于会话中：
+
+```ts
+socket.emit('conversation.message.send', { conversationId: 'CONVERSATION_ID', content: '你好' });
+socket.emit('conversation.message.read', { conversationId: 'CONVERSATION_ID', limit: 50 });
+socket.emit('conversation.message.edit', { conversationId: 'CONVERSATION_ID', messageId: 'MESSAGE_ID', content: '修改后的内容' });
+socket.emit('conversation.message.recall', { conversationId: 'CONVERSATION_ID', messageId: 'MESSAGE_ID' });
+```
+
+私聊消息同样是 2 分钟内可编辑、3 分钟内可撤回。历史读取返回 `conversation.message.batch`，新消息、编辑和撤回分别返回 `conversation.message.created`、`conversation.message.edited` 和 `conversation.message.recalled`。
+
+## 互动按钮消息
+
+机器人可以把 `content` 设置为互动消息，普通用户接口不允许使用该类型：
+
+```ts
+socket.emit('message.send', {
+  roomId: 'ROOM_ID',
+  content: {
+    type: 'interactive',
+    text: '请选择操作',
+    buttons: [[
+      { id: 'accept', label: '接受', action: 'invite.accept' },
+      { id: 'reject', label: '拒绝', action: 'invite.reject' }
+    ]]
+  }
+});
+```
+
+最多 10 行，每行最多 3 个按钮。用户点击后，机器人会在自己的连接中收到 `interaction.created`，其中包含 `messageId`、`buttonId`、`action`、`value` 和点击用户 ID。
+
+## 事件类型
+
+| 事件 | 触发时机 |
+| --- | --- |
+| `message.created` / `conversation.message.created` | 群聊或私聊新消息通过扫描后 |
+| `message.edited` / `conversation.message.edited` | 消息被发送者编辑 |
+| `message.recalled` / `conversation.message.recalled` | 消息被发送者撤回 |
+| `message.read` | 群成员标记消息已读 |
+| `typing.started` / `typing.stopped` | 用户或机器人输入状态变化 |
+| `room.member.joined` / `room.member.left` / `room.member.updated` | 群成员关系变化 |
+| `notification.created` | 所属用户收到站内通知 |
+| `presence.updated` | 所属用户上线或离线 |
+| `content.changed` | 公开且审核通过的资源、帖子或视频发生公开状态变化 |
+| `server.status.updated` | 公开找服玩服务器在线状态、在线人数或延迟变化 |
+| `interaction.created` | 用户点击机器人互动按钮 |
+
+## 响应与错误
+
+带 `requestId` 的命令成功返回 `command.accepted`，失败返回 `command.rejected`。常见错误码包括 `SCOPE_REQUIRED`、`TOPIC_INVALID`、`TOPIC_FORBIDDEN`、`ROOM_MEMBERSHIP_REQUIRED`、`CONVERSATION_ACCESS_REQUIRED`、`MESSAGE_PAYLOAD_INVALID`、`MESSAGE_EDIT_WINDOW_EXPIRED`、`MESSAGE_RECALL_WINDOW_EXPIRED`、`ROOM_MANAGER_REQUIRED` 和 `COMMAND_UNSUPPORTED`。
+
+`requestId` 在同一连接内可用于幂等重试；机器人应限制连接数和发送频率，并避免记录完整 WebSocket Key。

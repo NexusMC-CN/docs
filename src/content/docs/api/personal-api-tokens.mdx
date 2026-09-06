@@ -24,6 +24,8 @@ Token scope 只表示“这个 Token 可以请求哪些接口”，不能替代�
 
 | 你要做什么 | 直接阅读 |
 | --- | --- |
+| 以站点身份读取公开站点数据 | [站点 API：密钥与公开内容接口](/docs/api/site-api-keys/) |
+| 直接使用现成工具接入 API | [可直接使用 API 的项目](/docs/api/ready-to-use-projects/) |
 | 上传文件或图片 | [个人 API：文件上传](/docs/api/personal-api-uploads/) |
 | 上传资源文件并发布资源 | [个人 API：资源上传与发布流程](/docs/api/personal-api-resource-upload-flow/) |
 | 创建、读取或更新资源 | [个人 API：资源](/docs/api/personal-api-resources/) |
@@ -37,6 +39,8 @@ Token scope 只表示“这个 Token 可以请求哪些接口”，不能替代�
 ::: note
 个人 API 只代表 Token 所属用户本人，不是后台管理接口，也不会继承版主、管理员、协作者或组织身份。
 :::
+
+读取公开资源详情、版本、文件元数据和更新摘要时，可以直接使用本页列出的“无需认证”接口，不需要个人 Token 或站点 API Key。只有需要读取更广泛的站点内容索引或进行服务端集成时，才使用由管理员单独签发的[站点 API 密钥](/docs/api/site-api-keys/)。不要把个人 Token 当作站点凭据。
 
 ## Base URL
 
@@ -52,7 +56,7 @@ https://www.nexusmc.cn/api/posts
 
 ## 认证方式
 
-所有个人 API 请求使用 Bearer Token：
+需要个人身份和 scope 的接口使用 Bearer Token：
 
 ```http
 Authorization: Bearer avm_pat_xxxxx_xxxxx
@@ -106,6 +110,64 @@ result = response.json()
 
 Token 明文只在创建时显示一次。不要把 Token 放进公开仓库、浏览器前端代码、构建产物或可下载的配置文件。
 
+标记为“无需认证”的公开读取接口不要发送 `Authorization`。这类接口只返回公开、已审核且当前访问者有权查看的数据，不会绕过隐藏、付费或其他内容访问限制。
+
+## 无需认证读取公开资源
+
+自动化程序在发布前应先读取发布元数据，不要通过反复提交错误 payload 来猜分类、标签或版本字段：
+
+```http
+GET /api/resources/publishing-metadata?platform=java
+```
+
+资源详情和版本读取也无需认证：
+
+```http
+GET /api/resources/{id}
+GET /api/resources/{id}/versions
+GET /api/resources/{id}/versions/{versionId}
+GET /api/resources/{id}/files
+```
+
+这里的 `{id}` 支持内部 UUID、公开 slug、公开数字 ID 和 `slug.publicId` 组合标识。`GET /api/resources/{id}/versions` 按审核通过时间倒序返回，第一个是最近审核通过的版本；它不是版本号字符串的语义化排序。
+
+## 获取自己的内容 ID
+
+更新已有内容前，不需要从浏览器地址栏里猜 ID。四类“我的内容”接口都会返回每项的稳定 `id`、当前 `slug` 和站内 `path`：
+
+| 内容 | 查询接口 | 列表字段 | 所需权限 |
+| --- | --- | --- | --- |
+| 资源 | `GET /api/users/me/resources` | `resources` | `resource:read:self` |
+| 帖子 | `GET /api/users/me/posts` | `posts` | `post:read:self` |
+| 找服玩 | `GET /api/users/me/players` | `players` | `player:read:self` |
+| 视频 | `GET /api/users/me/videos` | `videos` | `video:read:self` |
+
+例如按标题查询自己的资源：
+
+```bash
+curl "https://www.nexusmc.cn/api/users/me/resources?q=MittelLib&pageSize=10" \
+  -H "Authorization: Bearer avm_pat_xxxxx_xxxxx" \
+  -H "Accept: application/json"
+```
+
+响应中的 `resources[].id` 可直接保存为 GitHub Actions 的 `NEXUSMC_RESOURCE_ID`：
+
+```json
+{
+  "resources": [
+    {
+      "id": "8a86e434-5050-4f4a-a861-5a5fe28873a4",
+      "slug": "mittelib",
+      "path": "/resources/mittelib",
+      "title": "MittelLib"
+    }
+  ],
+  "pagination": { "page": 1, "pageSize": 10, "total": 1, "totalPages": 1 }
+}
+```
+
+`id` 是自动化配置的首选值，创建接口的成功响应也会直接返回它。内容接口同时兼容当前或历史 `slug`、公开编号以及完整公开链接中的路径段，但 slug 可能随标题或自定义路径修改，不适合长期写死。
+
 ## 权限表
 
 | 权限值 | 允许调用的能力 |
@@ -138,7 +200,7 @@ Token 明文只在创建时显示一次。不要把 Token 放进公开仓库、�
 ## 接口导航
 
 <DocsApiTable
-  title="个人内容接口"
+  title="公开读取与个人内容接口"
   columns={[
     { key: 'method', label: '方法', kind: 'badge', align: 'center' },
     { key: 'path', label: '路径', kind: 'code' },
@@ -146,6 +208,18 @@ Token 明文只在创建时显示一次。不要把 Token 放进公开仓库、�
     { key: 'description', label: '说明' },
   ]}
   rows={[
+    { method: 'GET', path: '/api/resources/publishing-metadata?platform=java', scope: ['无需认证'], description: '读取资源发布契约、字段别名和发现接口' },
+    { method: 'GET', path: '/api/resources/platforms', scope: ['无需认证'], description: '读取可用资源平台' },
+    { method: 'GET', path: '/api/resources/categories?platform=java', scope: ['无需认证'], description: '读取分类树；提交 category 和 subCategory 时使用 filterValue' },
+    { method: 'GET', path: '/api/resources/version-groups', scope: ['无需认证'], description: '读取版本分组元数据' },
+    { method: 'GET', path: '/api/resources/game-versions?platform=java', scope: ['无需认证'], description: '读取可提交到 mcVersions 的游戏版本号' },
+    { method: 'GET', path: '/api/resources/version-tags', scope: ['无需认证'], description: '读取 versionTag 可选值' },
+    { method: 'GET', path: '/api/resources/official-tag-groups', scope: ['无需认证'], description: '读取官方标签组、标签 ID 和 slug' },
+    { method: 'GET', path: '/api/resources/updates', scope: ['无需认证'], description: '读取公开资源更新摘要，用于更新检查' },
+    { method: 'GET', path: '/api/resources/{id}', scope: ['无需认证'], description: '读取公开、已审核且可见的资源信息' },
+    { method: 'GET', path: '/api/resources/{id}/versions', scope: ['无需认证'], description: '读取已审核版本列表，最近审核通过的版本排在第一项' },
+    { method: 'GET', path: '/api/resources/{id}/versions/{versionId}', scope: ['无需认证'], description: '读取指定的已审核资源版本' },
+    { method: 'GET', path: '/api/resources/{id}/files', scope: ['无需认证'], description: '读取公开资源的已审核版本文件元数据' },
     { method: 'POST', path: '/api/upload', scope: ['upload:file'], description: '上传单个文件' },
     { method: 'POST', path: '/api/upload/multiple', scope: ['upload:file'], description: '上传多个文件' },
     { method: 'POST', path: '/api/upload/image', scope: ['upload:file'], description: '上传图片' },
@@ -154,15 +228,15 @@ Token 明文只在创建时显示一次。不要把 Token 放进公开仓库、�
     { method: 'POST', path: '/api/upload/session/init', scope: ['upload:file'], description: '初始化分块上传' },
     { method: 'GET', path: '/api/upload/session/{uploadId}/status', scope: ['upload:file'], description: '查询分块合并状态' },
     { method: 'GET', path: '/api/upload/download', scope: ['无需认证'], description: '按指定文件名下载站点托管文件' },
-    { method: 'GET', path: '/api/resources/{id}/edit', scope: ['resource:read:self'], description: '读取资源编辑态' },
-    { method: 'POST', path: '/api/resources', scope: ['resource:create'], description: '创建资源' },
-    { method: 'PATCH', path: '/api/resources/{id}', scope: ['resource:update:self'], description: '更新资源' },
-    { method: 'POST', path: '/api/resources/{id}/versions', scope: ['resource:update:self'], description: '提交资源版本' },
+    { method: 'GET', path: '/api/resources/{id}/edit/core', scope: ['resource:read:self'], description: '读取资源核心编辑数据' },
+    { method: 'POST', path: '/api/resources', scope: ['resource:create'], description: '创建资源（写操作，不是读取资源列表）' },
+    { method: 'PATCH', path: '/api/resources/{id}', scope: ['resource:update:self'], description: '更新自己的资源' },
+    { method: 'POST', path: '/api/resources/{id}/versions', scope: ['resource:update:self'], description: '提交待审核的新版本（读取版本请使用同路径的 GET）' },
     { method: 'DELETE', path: '/api/resources/{id}', scope: ['resource:delete:self'], description: '删除自己的资源' },
-    { method: 'GET', path: '/api/posts/{id}/edit', scope: ['post:read:self'], description: '读取帖子编辑态' },
+    { method: 'GET', path: '/api/posts/{id}/edit/core', scope: ['post:read:self'], description: '读取帖子核心编辑数据' },
     { method: 'POST', path: '/api/posts', scope: ['post:create'], description: '创建帖子' },
     { method: 'PUT', path: '/api/posts/{id}', scope: ['post:update:self'], description: '更新帖子' },
-    { method: 'GET', path: '/api/players/{id}/edit', scope: ['player:read:self'], description: '读取找服玩编辑态' },
+    { method: 'GET', path: '/api/players/{id}/edit/core', scope: ['player:read:self'], description: '读取找服玩核心编辑数据' },
     { method: 'POST', path: '/api/players', scope: ['player:create'], description: '创建找服玩投稿' },
     { method: 'PUT', path: '/api/players/{id}', scope: ['player:update:self'], description: '更新找服玩投稿' },
     { method: 'GET', path: '/api/videos/{id}/edit', scope: ['video:read:self'], description: '读取视频编辑态' },

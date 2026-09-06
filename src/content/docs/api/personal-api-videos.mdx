@@ -26,6 +26,8 @@ import DocsEndpoint from '../../../components/DocsEndpoint.astro';
   ]}
 />
 
+`{id}` 推荐使用列表或创建响应返回的稳定视频 ID，也兼容当前或历史 slug、公开编号和公开链接中的路径段。
+
 ## 查询自己的视频
 
 <DocsEndpoint method="GET" path="/api/users/me/videos" scope="video:read:self" />
@@ -81,6 +83,8 @@ videos = response.json()
 | `status` | `string` | 否 | — | 按状态筛选。 |
 | `q` | `string` | 否 | 空 | 按标题或简介搜索。 |
 | `sort` | `string` | 否 | `updated` | `updated` 或 `created`。 |
+
+响应的 `videos[]` 每项都包含 `id`、`slug` 和 `path`。更新视频时直接使用 `videos[].id`，无需查看网页 URL。
 
 读取单项编辑数据：
 

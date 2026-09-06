@@ -31,7 +31,10 @@ const browserTitle = title === '帮助中心'
   : title
     ? `${title} - NexusMC 帮助中心`
     : 'NexusMC 帮助中心与文档入口';
-const activePrimaryNav = DOCS_PRIMARY_NAV.find((item) => item.sections.includes(currentSection));
+const activePrimaryNav = DOCS_PRIMARY_NAV.find((item) => (
+  item.sections.includes(currentSection)
+  || (item.href && (Astro.url.pathname === item.href || Astro.url.pathname.startsWith(`${item.href}/`)))
+));
 ---
 
 <!DOCTYPE html>
@@ -65,7 +68,7 @@ const activePrimaryNav = DOCS_PRIMARY_NAV.find((item) => item.sections.includes(
             <DocsIcon name="open-in-new" />
             <span class="docs-topbar__label">返回主站</span>
           </a>
-          <a href="/" class="docs-outline-link px-3 py-2">
+          <a href="/help" class="docs-outline-link px-3 py-2">
             <DocsIcon name="home-outline" />
             <span class="docs-topbar__label">帮助中心</span>
           </a>

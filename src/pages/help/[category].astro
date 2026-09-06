@@ -1,0 +1,20 @@
+---
+import HelpCenterLayout from '../../layouts/HelpCenterLayout.astro';
+import { getHelpCategory, HELP_CATEGORIES, type HelpCategory } from '../../lib/helpCenter';
+
+export const prerender = true;
+
+export function getStaticPaths() {
+  return HELP_CATEGORIES.map((category) => ({
+    params: { category: category.slug },
+    props: { category },
+  }));
+}
+
+const category = (Astro.props.category || getHelpCategory(Astro.params.category || '')) as HelpCategory | undefined;
+if (!category) {
+  return Astro.redirect('/help');
+}
+---
+
+<HelpCenterLayout category={category} />

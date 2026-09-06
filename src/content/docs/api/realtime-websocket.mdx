@@ -1,0 +1,90 @@
+---
+title: 实时 API：WebSocket 与机器人
+description: 使用 WebSocket Key 连接实时命名空间、订阅主题并处理命令响应。
+section: API
+sidebarGroup: WebSocket 接口
+order: 90
+---
+
+实时接口面向机器人和服务端程序，使用 Socket.IO 连接 `/realtime/v1`。它与站点层 HTTP API 分开授权：需要 WebSocket Key 和对应 scope，不接受个人 API Token 或站点 API Key。
+
+## 连接与认证
+
+WebSocket Key 在开发者中心创建。连接时可以放在 `auth.token`，也可以使用 Bearer 请求头。名称调整不会使已有机器人密钥失效：
+
+```ts
+import { io } from 'socket.io-client';
+
+const socket = io('https://www.nexusmc.cn/realtime/v1', {
+  auth: { token: process.env.NEXUSMC_WEBSOCKET_KEY },
+  transports: ['websocket'],
+});
+
+socket.on('ready', (event) => {
+  console.log(event.payload.protocol, event.payload.scopes);
+});
+```
+
+服务端首先发送 `ready`。所有服务端消息都使用统一信封：
+
+```json
+{
+  "id": "evt_mf3k_abc123",
+  "type": "ready",
+  "ts": "2026-09-04T08:30:00.000Z",
+  "requestId": null,
+  "payload": {}
+}
+```
+
+认证失败会以 Socket.IO 连接错误 `BOT_AUTH_REQUIRED` 或 `BOT_AUTH_INVALID` 结束连接。机器人被停用、WebSocket Key 被撤销或超过有效期时，后续连接都会被拒绝；错误码为兼容旧客户端保留原名。
+
+## 命令
+
+```ts
+socket.emit('subscribe', { requestId: 'sub-1', topic: 'room:ROOM_ID' });
+socket.emit('unsubscribe', { requestId: 'sub-2', topic: 'room:ROOM_ID' });
+socket.emit('ping', { requestId: 'ping-1' });
+```
+
+| 命令 | scope | 说明 |
+| --- | --- | --- |
+| `subscribe` / `unsubscribe` | `bot:chat:subscribe` | 订阅或取消 `user:<id>`、`conversation:<id>`、`room:<id>`、`notification:<id>`、`content:resource` / `content:post` / `content:video` / `content:all`。内容主题还需要 `bot:content:subscribe`。 |
+| `room.join` | `bot:chat:write` | 使用有效群聊邀请码加入公开可邀请的群。 |
+| `room.leave` | `bot:chat:write` | 退出一个已加入的群。 |
+| `ping` | 连接权限 | 返回 `pong`，用于保活。 |
+| `message.read` | `bot:chat:read` | 读取已加入群聊的最近消息。 |
+| `message.send` | `bot:chat:write` | 在已加入且未被禁言的群聊发送消息。 |
+| `conversation.message.send` | `bot:dm:write` | 在机器人作为参与者的私聊会话中发送消息。 |
+| `conversation.message.read` | `bot:dm:read` | 读取机器人参与的私聊历史。 |
+| `conversation.message.recall` | `bot:dm:write` | 撤回机器人自己发送的私聊消息。 |
+| `conversation.message.edit` | `bot:dm:write` | 编辑机器人自己发送且在 2 分钟窗口内的私聊消息。 |
+| `room.member.role` / `room.member.remove` | `bot:chat:moderate` | 按站内群主/管理员规则修改或移除群成员。 |
+| `room.member.mute` / `room.member.unmute` | `bot:chat:moderate` | 按权限禁言或解除禁言群成员。 |
+| `message.read` + `messageId` | `bot:chat:read` | 将机器人在该群的未读数清零，并广播已读事件。 |
+| `message.recall` | `bot:chat:write` | 撤回机器人自己发送且仍在撤回时限内的消息。 |
+| `message.edit` | `bot:chat:write` | 编辑机器人自己发送且在 2 分钟窗口内的群聊消息。 |
+| `typing.start` / `typing.stop` | `bot:chat:write` | 广播输入中状态，不写入数据库。 |
+
+成功的订阅命令返回 `command.accepted`；权限不足返回 `command.rejected` 和 `SCOPE_REQUIRED`；主题格式错误返回 `TOPIC_INVALID`。传入相同 `requestId` 的命令会复用第一次结果，调用方可安全重试。
+
+## 消息示例
+
+```ts
+socket.emit('room.join', { requestId: 'join-1', inviteCode: 'INVITE_CODE' });
+socket.emit('subscribe', { requestId: 'sub-1', topic: 'room:ROOM_ID' });
+socket.emit('message.read', { requestId: 'read-1', roomId: 'ROOM_ID', limit: 50 });
+socket.emit('message.send', { requestId: 'send-1', roomId: 'ROOM_ID', content: '机器人上线了' });
+socket.emit('typing.start', { requestId: 'typing-1', roomId: 'ROOM_ID' });
+socket.on('message.created', (event) => console.log(event.payload));
+socket.on('typing.started', (event) => console.log(event.payload));
+socket.on('content.changed', (event) => console.log(event.payload));
+```
+
+发送消息会经过与站内群聊相同的内容扫描和 AI 审核队列；只有扫描状态为 `cleared` 时才更新群最后消息和成员未读数。成功发送会向订阅该群的机器人连接推送 `message.created`。
+
+## 当前边界
+
+当前版本已经提供机器人身份认证、连接、保活、群聊入群、成员校验、历史读取、消息发送、编辑、撤回、已读、输入状态、成员变更、私聊读写、群管理和主题订阅协议。私聊和群聊消息统一允许发送者在发送后 2 分钟内编辑、3 分钟内撤回。`notification:<用户ID>` 与 `user:<用户ID>` 主题仅允许订阅机器人所属开发者或机器人自身；通知会以 `notification.created` 推送，在线变化会以 `presence.updated` 推送。公开内容主题只推送公开且审核通过的资源、帖子和视频变化。
+
+机器人应用应限制并发连接数量和消息频率，断线后使用指数退避重连；不要在日志中记录完整 Token。HTTP 站点 API 的公开搜索、活动和排行榜仍应使用对应的 `X-API-Key` scope。

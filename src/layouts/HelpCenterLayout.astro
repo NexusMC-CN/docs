@@ -1,0 +1,80 @@
+---
+import DocsBaseLayout from './DocsBaseLayout.astro';
+import DocsIcon from '../components/DocsIcon.astro';
+import { HELP_CATEGORIES, type HelpCategory } from '../lib/helpCenter';
+
+interface Props {
+  category: HelpCategory;
+}
+
+const { category } = Astro.props;
+---
+
+<DocsBaseLayout title={category.label} description={category.description}>
+  <main class="docs-shell help-center-shell">
+    <header class="help-center-header">
+      <div class="docs-kicker docs-kicker--icon">
+        <DocsIcon name="help-circle-outline" />
+        <span>帮助中心</span>
+      </div>
+      <h1 class="help-center-title">问题与解答</h1>
+      <p class="help-center-description">账号、内容、投稿、消息与开发接入相关的常见问题。</p>
+    </header>
+
+    <div class="help-center-grid">
+      <aside class="help-category-nav card-base" aria-label="帮助类别">
+        <div class="help-category-nav__title">问题类别</div>
+        <nav>
+          {HELP_CATEGORIES.map((item) => (
+            <a
+              href={`/help/${item.slug}`}
+              class:list={['help-category-link', item.slug === category.slug && 'is-active']}
+              aria-current={item.slug === category.slug ? 'page' : undefined}
+            >
+              <span>{item.label}</span>
+              <DocsIcon name="chevron-right" />
+            </a>
+          ))}
+        </nav>
+      </aside>
+
+      <section class="help-questions" aria-labelledby="help-category-title">
+        <div class="help-questions__header">
+          <h2 id="help-category-title">{category.label}</h2>
+          <p>{category.description}</p>
+        </div>
+
+        <div class="help-question-list">
+          {category.questions.map((item, index) => (
+            <details class="help-question" id={item.id} open={index === 0}>
+              <summary class="help-question__summary">
+                <span class="help-question__number">{String(index + 1).padStart(2, '0')}</span>
+                <span class="help-question__title">{item.question}</span>
+                <DocsIcon name="chevron-down" class="help-question__chevron" />
+              </summary>
+              <div class="help-question__answer">
+                {item.answer.map((paragraph) => <p>{paragraph}</p>)}
+                {item.steps && (
+                  <ol>
+                    {item.steps.map((step) => <li>{step}</li>)}
+                  </ol>
+                )}
+                {item.related && (
+                  <div class="help-question__related">
+                    <span>延伸阅读</span>
+                    {item.related.map((link) => (
+                      <a href={link.href}>
+                        {link.label}
+                        <DocsIcon name="arrow-right" />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </details>
+          ))}
+        </div>
+      </section>
+    </div>
+  </main>
+</DocsBaseLayout>
