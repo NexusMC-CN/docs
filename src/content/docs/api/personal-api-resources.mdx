@@ -159,14 +159,17 @@ curl "https://www.nexusmc.cn/api/resources/version-tags" \
 | --- | --- | --- | --- |
 | `title` | `string` | 是 | 标题，1～200 字符。 |
 | `content` | `object \| string` | 是 | 正文，推荐传 TipTap JSON；最大约 200,000 字符。 |
+| `authorContribution` | `string` | 否 | 作者贡献说明，最多 500 字符。 |
 | `category` | `string` | 是 | 资源分类 ID 或分类值。 |
 | `description` | `string` | 否 | 简介，最多 1,000 字符。 |
 | `platform` | `string` | 否 | 平台，最多 20 字符。 |
 | `subCategory` | `string \| array<string>` | 否 | Loader/子分类。 |
 | `sideSupport` | `string` | 否 | 客户端、服务端等运行侧支持。 |
 | `mcVersions` | `array<string>` | 否 | 支持的 Minecraft 版本。 |
+| `gameVersions` | `array<string>` | 否 | `mcVersions` 的等价别名；两者同时传入时以 `mcVersions` 为准。 |
 | `tags` | `array<string>` | 否 | 自定义标签。 |
 | `officialTags` | `array<string>` | 否 | 官方标签。 |
+| `customCategorySelections` | `object` | 否 | 自定义分类选择，形如 `{ "分组 ID": ["值"] }`；每个分组最多 20 项，每项最多 80 字符。 |
 | `fileUrl` | `string \| null` | 否 | 外链下载地址；本地托管优先使用 `files`。 |
 | `extractCode` | `string \| null` | 否 | 外部网盘提取码，最多 100 字符。 |
 | `fileSize` | `number` | 否 | 兼容的单文件大小，单位字节。 |
@@ -293,14 +296,17 @@ created = response.json()
 | --- | --- | --- | --- |
 | `title` | `string` | 否 | 标题，1～200 字符。 |
 | `content` | `object \| string` | 否 | 正文；推荐传 TipTap JSON。 |
+| `authorContribution` | `string` | 否 | 作者贡献说明，最多 500 字符。 |
 | `category` | `string` | 否 | 资源分类 ID 或分类值。 |
 | `description` | `string` | 否 | 简介，最多 1,000 字符。 |
 | `platform` | `string` | 否 | 平台，最多 20 字符。 |
 | `subCategory` | `string \| array<string>` | 否 | Loader/子分类。 |
 | `sideSupport` | `string` | 否 | 运行侧支持。 |
 | `mcVersions` | `array<string>` | 否 | 支持的 Minecraft 版本。 |
+| `gameVersions` | `array<string>` | 否 | `mcVersions` 的等价别名；两者同时传入时以 `mcVersions` 为准。 |
 | `tags` | `array<string>` | 否 | 自定义标签。 |
 | `officialTags` | `array<string>` | 否 | 官方标签。 |
+| `customCategorySelections` | `object` | 否 | 自定义分类选择，形如 `{ "分组 ID": ["值"] }`；每个分组最多 20 项，每项最多 80 字符。 |
 | `fileUrl` | `string \| null` | 否 | 外链下载地址。 |
 | `extractCode` | `string \| null` | 否 | 外部网盘提取码。 |
 | `fileSize` | `number` | 否 | 兼容的单文件大小，单位字节。 |
