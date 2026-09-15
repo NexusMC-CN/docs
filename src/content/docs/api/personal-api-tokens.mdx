@@ -197,6 +197,10 @@ curl "https://www.nexusmc.cn/api/users/me/resources?q=MittelLib&pageSize=10" \
 
 建议一个自动化程序使用一个 Token，并只授予实际需要的最小权限。
 
+::: note
+四个 `*:read:feed` 权限由 `GET /api/users/me/latest-updates` 使用，四个 `*:read:activity` 权限由 `GET /api/users/me/activity` 使用。这两个接口要求同一组的四个权限全部授予，只勾其中一个不会生效。
+:::
+
 ## 接口导航
 
 <DocsApiTable
@@ -228,6 +232,10 @@ curl "https://www.nexusmc.cn/api/users/me/resources?q=MittelLib&pageSize=10" \
     { method: 'POST', path: '/api/upload/session/init', scope: ['upload:file'], description: '初始化分块上传' },
     { method: 'GET', path: '/api/upload/session/{uploadId}/status', scope: ['upload:file'], description: '查询分块合并状态' },
     { method: 'GET', path: '/api/upload/download', scope: ['无需认证'], description: '按指定文件名下载站点托管文件' },
+    { method: 'GET', path: '/api/upload/limits', scope: ['upload:file'], description: '读取当前账号的实际上传限额与允许类型' },
+    { method: 'GET', path: '/api/users/me/latest-updates', scope: ['resource:read:feed', 'post:read:feed', 'player:read:feed', 'video:read:feed'], description: '读取全站最近更新的公开内容与最近互动' },
+    { method: 'GET', path: '/api/users/me/activity', scope: ['resource:read:activity', 'post:read:activity', 'player:read:activity', 'video:read:activity'], description: '读取自己内容的互动摘要' },
+    { method: 'GET', path: '/api/users/{id}/featured', scope: ['resource:read:self'], description: '读取指定用户的精选内容与精选位上限' },
     { method: 'GET', path: '/api/resources/{id}/edit/core', scope: ['resource:read:self'], description: '读取资源核心编辑数据' },
     { method: 'POST', path: '/api/resources', scope: ['resource:create'], description: '创建资源（写操作，不是读取资源列表）' },
     { method: 'PATCH', path: '/api/resources/{id}', scope: ['resource:update:self'], description: '更新自己的资源' },
@@ -244,6 +252,35 @@ curl "https://www.nexusmc.cn/api/users/me/resources?q=MittelLib&pageSize=10" \
     { method: 'PUT', path: '/api/videos/{id}', scope: ['video:update:self'], description: '更新视频投稿' },
   ]}
 />
+
+## 读取全站更新与互动摘要
+
+<DocsEndpoint method="GET" path="/api/users/me/latest-updates" scope="resource:read:feed + post:read:feed + player:read:feed + video:read:feed" />
+
+读取全站最近更新的公开内容，按资源、帖子、找服玩、视频分组返回，另外附带最近互动。
+
+| 查询参数 | 说明 |
+| --- | --- |
+| `resourceLimit`、`postLimit`、`playerLimit`、`videoLimit` | 每类返回条数，默认 8，最多 20。 |
+| `interactionLimit` | 最近互动条数，默认 3，最多 8。 |
+
+响应包含 `resources`、`posts`、`players`、`videos` 和 `interactions`。
+
+<DocsEndpoint method="GET" path="/api/users/me/activity" scope="resource:read:activity + post:read:activity + player:read:activity + video:read:activity" />
+
+读取自己四类内容的互动摘要，用来判断哪些内容有新评论或回复。
+
+| 查询参数 | 说明 |
+| --- | --- |
+| `limit` | 每类返回条数，默认 10，最多 30。 |
+
+响应同样按 `resources`、`posts`、`players`、`videos` 分组，每项包含 `id` 和 `interactionSummary`（`commentCount`、`replyCount`、`latestAt`、`comments`、`replies`）。
+
+## 读取用户精选内容
+
+<DocsEndpoint method="GET" path="/api/users/{id}/featured" scope="resource:read:self" />
+
+读取指定用户的精选内容与精选位上限，响应包含 `featured`、`limit` 和 `canEdit`。`{id}` 填自己的用户 ID 时，`canEdit` 返回 `true`。
 
 ## 正文字段边界
 

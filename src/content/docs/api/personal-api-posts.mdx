@@ -20,6 +20,8 @@ import DocsEndpoint from '../../../components/DocsEndpoint.astro';
   ]}
   rows={[
   { method: 'GET', path: '/api/posts/{id}/edit/core', auth: 'post:read:self', description: '读取自己的帖子核心编辑数据' },
+  { method: 'GET', path: '/api/posts/{id}/edit/event', auth: 'post:read:self', description: '读取帖子上的活动信息' },
+  { method: 'GET', path: '/api/posts/{id}/edit/permissions', auth: 'post:read:self', description: '读取当前用户对帖子的编辑权限' },
   { method: 'GET', path: '/api/users/me/posts', auth: 'post:read:self', description: '分页查询自己的帖子' },
   { method: 'POST', path: '/api/posts', auth: 'post:create', description: '创建帖子或保存草稿' },
   { method: 'PUT', path: '/api/posts/{id}', auth: 'post:update:self', description: '更新自己的帖子' },
@@ -125,6 +127,15 @@ post = response.json()
 ```
 
 :::
+
+### 其他编辑数据接口
+
+| 接口 | 权限 | 响应 |
+| --- | --- | --- |
+| `GET /api/posts/{id}/edit/event` | `post:read:self` | `event`，未设置活动时为 `null` |
+| `GET /api/posts/{id}/edit/permissions` | `post:read:self` | `canEdit`、`canDelete`、`canEditReportPublicPost`、`canEditLockedPostAsPrivilegedUser`、`canEditPostAsModerator` |
+
+聚合接口 `GET /api/posts/{id}/edit` 已停止服务，会返回 `410` 和 `POST_EDIT_AGGREGATE_RETIRED`，请改用上表中的接口。
 
 ## 创建帖子
 
@@ -244,6 +255,10 @@ created = response.json()
 <DocsEndpoint method="PUT" path="/api/posts/{id}" scope="post:update:self" contentType="application/json" />
 
 所有字段均为可选，只修改请求里出现的字段。个人 Token 只能更新本人创建的帖子。
+
+::: note
+更新非草稿状态的帖子会重新进入审核，状态回到 `pending`，审核期间前台仍展示旧内容。草稿只有在请求发布时才会提交审核。
+:::
 
 ### 完整请求参数
 

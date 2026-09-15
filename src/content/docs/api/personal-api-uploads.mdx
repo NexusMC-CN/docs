@@ -30,6 +30,28 @@ import DocsEndpoint from '../../../components/DocsEndpoint.astro';
 
 直传确认成功后返回 `url`、`filename`、`size`、`key`、`bucketId`，不会返回 `sha256` / `sha1`。如果你的客户端必须保存哈希，请改用普通上传或分块上传。
 
+## 查询当前上传限制
+
+<DocsEndpoint method="GET" path="/api/upload/limits" scope="upload:file" />
+
+实际限额由站点配置和账号等级共同决定，会随配置变化。脚本不要写死体积上限，上传前先读一次：
+
+| 字段 | 说明 |
+| --- | --- |
+| `maxFileSizeMb` | 当前账号单文件上限（MB）。 |
+| `maxImageSizeMb` | 单张图片上限（MB）。 |
+| `maxTotalSizeMb` | 单次请求总大小上限（MB）。 |
+| `chunkThresholdMb` | 超过该体积建议改用分块上传（MB）。 |
+| `maxMultiFiles` | 多文件接口一次最多上传几个文件。 |
+| `allowedFileTypes` | 允许的文件扩展名。 |
+| `allowedImageTypes` | 允许的图片扩展名。 |
+| `userLevel` | 当前账号等级。 |
+| `levelLimitsEnabled` | 是否启用按等级区分限额。 |
+| `siteMaxFileSizeMb` | 站点级单文件上限（MB）。 |
+| `levelMaxSizeMb` | 当前等级对应的上限（MB）。 |
+
+该接口限流为每分钟 60 次，不需要每次上传都调用。
+
 ## 新手先照这个流程
 
 上传一个资源文件时，推荐按这个顺序做：
@@ -485,6 +507,30 @@ image = response.json()
   "optimizedSize": 123456
 }
 ```
+
+## 查询图片处理状态
+
+<DocsEndpoint method="GET" path="/api/upload/image/processing/{jobId}" scope="upload:file" />
+
+上传图片时如果在表单里带 `purpose=content` 和 `processing=background`，响应会改为返回任务而不是最终图片：
+
+```json
+{
+  "processing": true,
+  "processingJobId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+```
+
+此时缩略图和预览图在后台生成，用返回的 `processingJobId` 轮询本接口：
+
+| 字段 | 说明 |
+| --- | --- |
+| `jobId` | 任务 ID。 |
+| `status` | `processing`、`completed` 或 `failed`。 |
+| `result` | `completed` 时返回，包含派生图结果。 |
+| `error` | `failed` 时返回，表示已保留原图。 |
+
+`jobId` 只接受 8～64 位的字母、数字和连字符；格式不合法返回 `400`，任务不存在或不属于当前账号返回 `404`。
 
 ## 分块上传
 
