@@ -20,6 +20,7 @@ import DocsEndpoint from '../../../components/DocsEndpoint.astro';
   ]}
   rows={[
   { method: 'GET', path: '/api/players/{id}/edit/core', auth: 'player:read:self', description: '读取自己的投稿核心编辑数据' },
+  { method: 'GET', path: '/api/players/{id}/edit/tutorials', auth: 'player:read:self', description: '读取投稿关联的教程帖' },
   { method: 'GET', path: '/api/users/me/players', auth: 'player:read:self', description: '分页查询自己的投稿' },
   { method: 'POST', path: '/api/players', auth: 'player:create', description: '创建投稿或保存草稿' },
   { method: 'PUT', path: '/api/players/{id}', auth: 'player:update:self', description: '更新自己的投稿' },
@@ -125,6 +126,14 @@ player = response.json()
 ```
 
 :::
+
+### 其他编辑数据接口
+
+| 接口 | 权限 | 响应 |
+| --- | --- | --- |
+| `GET /api/players/{id}/edit/tutorials` | `player:read:self` | `tutorialPosts` |
+
+聚合接口 `GET /api/players/{id}/edit` 已停止服务，会返回 `410` 和 `PLAYER_EDIT_AGGREGATE_RETIRED`，请改用 `core` 与 `tutorials` 两个接口。
 
 ## 创建找服玩投稿
 
