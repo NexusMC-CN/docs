@@ -310,6 +310,10 @@ created = response.json()
 
 `PUT` 和 `PATCH` 在此接口中都按部分更新处理：只修改请求里出现的字段。个人 Token 只能更新本人创建的资源。
 
+::: note
+更新已发布（`approved`）或已拒（`rejected`）的资源会重新进入审核，状态回到 `pending`，审核期间前台仍展示旧内容。只修改归档字段，或同时把 `visibility` 改为 `private`，不会触发重新审核。
+:::
+
 ### 完整请求参数
 
 | 参数 | 类型 | 必填 | 说明 |
