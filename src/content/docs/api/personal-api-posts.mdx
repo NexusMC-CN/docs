@@ -149,7 +149,9 @@ post = response.json()
 | `customSlug` | `string \| null` | 否 | 自定义路径，最多 120 字符。 |
 | `organizationId` | `string \| null` | 否 | 个人 Token 不允许指定组织；请省略或传 `null`。 |
 | `topicTagIds` | `array<string>` | 否 | 话题标签 ID，最多 5 个，每项最多 80 字符。 |
-| `postType` | `string` | 否 | `default`、`qa` 或 `poll`。 |
+| `postType` | `string` | 否 | `default`、`qa`、`poll` 或 `reference`。 |
+| `referenceTargetType` | `string \| null` | 否 | 引用目标类型，`resource` 或 `player`。仅 `reference` 使用。 |
+| `referenceTargetId` | `string \| null` | 否 | 引用目标 ID，最多 80 字符；目标必须是公开且已审核的资源或找服玩。仅 `reference` 使用。 |
 | `qaRewardAmount` | `integer` | 否 | 问答采纳奖励，0～1,000,000。仅 `qa` 使用。 |
 | `qaRewardPointSystemId` | `string \| null` | 否 | 问答奖励积分类型 ID，最多 80 字符。 |
 | `pollOptions` | `array<string>` | 否 | 投票选项，2～20 个，每项最多 120 字符。仅 `poll` 使用。 |
@@ -159,6 +161,26 @@ post = response.json()
 | `pollRewardAmount` | `integer` | 否 | 每位投票者奖励，0～1,000,000。 |
 | `pollRewardBudget` | `integer` | 否 | 投票奖励总预算，0～1,000,000，不能小于单次奖励。 |
 | `pollRewardPointSystemId` | `string \| null` | 否 | 投票奖励积分类型 ID，最多 80 字符。 |
+| `event` | `object \| null` | 否 | 活动信息，与 `postType` 独立设置；子字段见下方说明。 |
+
+### `event` 活动子字段
+
+传 `null` 可以清除已设置的活动。`enabled` 不为 `false` 时必须提供 `startsAt`。
+
+| 子字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `enabled` | `boolean` | 否 | 传 `false` 时不启用活动，其余子字段会被忽略。 |
+| `title` | `string` | 否 | 活动标题，最多 160 字符。 |
+| `summary` | `string` | 否 | 活动简介，最多 500 字符。 |
+| `startsAt` | `string` | 是 | 活动开始时间，建议 ISO 8601。 |
+| `endsAt` | `string \| null` | 否 | 活动结束时间，建议 ISO 8601；不能早于 `startsAt`。 |
+| `timezone` | `string` | 否 | 时区，最多 80 字符；省略时使用 `Asia/Shanghai`。 |
+| `locationName` | `string` | 否 | 活动地点名称，最多 160 字符。 |
+| `locationUrl` | `string` | 否 | 活动地点链接，最多 500 字符。 |
+| `coverImage` | `string` | 否 | 活动封面 URL，最多 500 字符。 |
+| `capacity` | `integer \| null` | 否 | 人数上限，0～1,000,000。 |
+| `rsvpEnabled` | `boolean` | 否 | 是否开启报名。 |
+| `status` | `string` | 否 | `scheduled` 或 `cancelled`；省略时为 `scheduled`。 |
 
 ### 普通帖示例
 
@@ -242,7 +264,9 @@ created = response.json()
 | `customSlug` | `string \| null` | 否 | 自定义路径。 |
 | `organizationId` | `string \| null` | 否 | 个人 Token 不允许指定组织；请省略或传 `null`。 |
 | `topicTagIds` | `array<string>` | 否 | 用本数组整体替换话题标签，最多 5 个。 |
-| `postType` | `string` | 否 | `default`、`qa` 或 `poll`。 |
+| `postType` | `string` | 否 | `default`、`qa`、`poll` 或 `reference`。 |
+| `referenceTargetType` | `string \| null` | 否 | 引用目标类型，`resource` 或 `player`。仅 `reference` 使用。 |
+| `referenceTargetId` | `string \| null` | 否 | 引用目标 ID，最多 80 字符。仅 `reference` 使用。 |
 | `qaRewardAmount` | `integer` | 否 | 问答采纳奖励，0～1,000,000。 |
 | `qaRewardPointSystemId` | `string \| null` | 否 | 问答奖励积分类型 ID。 |
 | `pollOptions` | `array<string>` | 否 | 投票选项，2～20 个。 |
@@ -252,6 +276,7 @@ created = response.json()
 | `pollRewardAmount` | `integer` | 否 | 每位投票者奖励。 |
 | `pollRewardBudget` | `integer` | 否 | 投票奖励总预算。 |
 | `pollRewardPointSystemId` | `string \| null` | 否 | 投票奖励积分类型 ID。 |
+| `event` | `object \| null` | 否 | 活动信息；子字段与「创建帖子」中的 `event` 子字段一致，传 `null` 可清除。 |
 
 ### 更新示例
 
@@ -311,5 +336,6 @@ updated = response.json()
 | `default` | 无 | 普通帖子；问答和投票字段会被清空或忽略。 |
 | `qa` | `qaRewardAmount`、`qaRewardPointSystemId` | 奖励大于 0 时必须能确定积分类型。 |
 | `poll` | `pollOptions`、`pollMode`、`pollMaxChoices` | 至少 2 个选项；多选至少可选 2 项。设置奖励时，总预算不能小于单次奖励。 |
+| `reference` | `referenceTargetType`、`referenceTargetId` | 必须指向一个公开且已审核的资源或找服玩；目标不可用时返回 400。 |
 
 切换 `postType` 会清理不属于新类型的数据。数组字段如 `tags`、`topicTagIds`、`pollOptions` 传入后会按新值保存；要保留旧值就不要发送。
